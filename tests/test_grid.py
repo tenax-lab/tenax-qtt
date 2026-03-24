@@ -1,7 +1,7 @@
 """Tests for grid specifications and coordinate mappings."""
 
 import pytest
-from tenax_qtt.grid import UniformGrid, GridSpec
+from tenax_qtt.grid import UniformGrid, GridSpec, num_sites, local_dim
 
 
 def test_uniform_grid_construction():
@@ -37,3 +37,41 @@ def test_gridspec_interleaved_equal_nbits():
     v2 = UniformGrid(-1.0, 1.0, 4)
     gs = GridSpec(variables=(v1, v2), layout="interleaved")
     assert gs.layout == "interleaved"
+
+
+def test_num_sites_1d():
+    g = GridSpec(variables=(UniformGrid(0, 1, 8),), layout="grouped")
+    assert num_sites(g) == 8
+
+
+def test_num_sites_grouped_2d():
+    v1 = UniformGrid(0, 1, 4)
+    v2 = UniformGrid(0, 1, 6)
+    g = GridSpec(variables=(v1, v2), layout="grouped")
+    assert num_sites(g) == 10  # 4 + 6
+
+
+def test_num_sites_interleaved_2d():
+    v1 = UniformGrid(0, 1, 4)
+    v2 = UniformGrid(0, 1, 4)
+    g = GridSpec(variables=(v1, v2), layout="interleaved")
+    assert num_sites(g) == 8  # 4 * 2
+
+
+def test_num_sites_fused_2d():
+    v1 = UniformGrid(0, 1, 4)
+    v2 = UniformGrid(0, 1, 6)
+    g = GridSpec(variables=(v1, v2), layout="fused")
+    assert num_sites(g) == 6  # max(4, 6)
+
+
+def test_local_dim_grouped():
+    g = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
+    assert local_dim(g, 0) == 2
+
+
+def test_local_dim_fused_2d():
+    v1 = UniformGrid(0, 1, 4)
+    v2 = UniformGrid(0, 1, 4)
+    g = GridSpec(variables=(v1, v2), layout="fused")
+    assert local_dim(g, 0) == 4  # 2^2

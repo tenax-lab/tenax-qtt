@@ -53,3 +53,25 @@ class GridSpec:
                     "Interleaved layout requires all variables to have the "
                     f"same n_bits, got {sorted(nbits)}"
                 )
+
+
+def num_sites(grid: GridSpec) -> int:
+    """Total number of MPS sites for this grid."""
+    d = len(grid.variables)
+    if grid.layout == "grouped":
+        return sum(v.n_bits for v in grid.variables)
+    elif grid.layout == "interleaved":
+        return grid.variables[0].n_bits * d
+    elif grid.layout == "fused":
+        return max(v.n_bits for v in grid.variables)
+    raise ValueError(f"Unknown layout: {grid.layout}")
+
+
+def local_dim(grid: GridSpec, site: int) -> int:
+    """Physical dimension at the given MPS site."""
+    if grid.layout in ("grouped", "interleaved"):
+        return 2
+    elif grid.layout == "fused":
+        d = len(grid.variables)
+        return 1 << d  # 2^d
+    raise ValueError(f"Unknown layout: {grid.layout}")
