@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
-          uv pip install -e ./tenax
+          uv pip install ./tenax
           uv pip install -e ".[dev]"
 
       - name: Run linter
@@ -80,7 +80,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
-          uv pip install -e ./tenax
+          uv pip install ./tenax
           uv pip install -e ".[dev]"
 
       - name: Run all tests
@@ -117,7 +117,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
-          uv pip install -e ./tenax
+          uv pip install ./tenax
           uv pip install -e ".[dev]"
 
       - name: Run core tests
@@ -154,7 +154,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
-          uv pip install -e ./tenax
+          uv pip install ./tenax
           uv pip install -e ".[dev]"
 
       - name: Run all tests
