@@ -3,8 +3,8 @@
 import jax.numpy as jnp
 import pytest
 
-from tenax_qtt.fourier import fourier_mpo
 from tenax_qtt.folding import fold_to_qtt
+from tenax_qtt.fourier import fourier_mpo
 from tenax_qtt.grid import GridSpec, UniformGrid
 
 

@@ -1,8 +1,9 @@
 """Tests for SVD-based QTT construction."""
 
 import jax.numpy as jnp
-from tenax_qtt.grid import UniformGrid, GridSpec
+
 from tenax_qtt.folding import fold_to_qtt
+from tenax_qtt.grid import GridSpec, UniformGrid
 
 
 def test_fold_constant():

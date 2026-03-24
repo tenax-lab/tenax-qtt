@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Literal
+from typing import Literal
 
 import jax.numpy as jnp
 import numpy as np
@@ -437,7 +438,7 @@ def _tci2(
             break
 
         # Pivot enrichment: if not converged, add pivots to grow bond dim
-        max_chi = max(len(I) for I in I_sets)
+        max_chi = max(len(iset) for iset in I_sets)
         if max_chi < max_bond_dim:
             _enrich_pivots(I_sets, J_sets, dims, max_bond_dim, rng, n_add=2)
 
@@ -628,7 +629,7 @@ def _prrlu(
             converged = True
             break
 
-        max_chi = max(len(I) for I in I_sets)
+        max_chi = max(len(iset) for iset in I_sets)
         if max_chi < max_bond_dim:
             _enrich_pivots(I_sets, J_sets, dims, max_bond_dim, rng, n_add=2)
 

@@ -1,11 +1,12 @@
 """Tests for QTT class."""
 
+import jax
 import jax.numpy as jnp
 import numpy as np
-import jax
-from tenax import DenseTensor, TensorIndex, FlowDirection
+from tenax import DenseTensor, FlowDirection, TensorIndex
 from tenax.core.mps import FiniteMPS
-from tenax_qtt.grid import UniformGrid, GridSpec
+
+from tenax_qtt.grid import GridSpec, UniformGrid
 from tenax_qtt.qtt import QTT
 
 
@@ -179,3 +180,23 @@ def test_norm_l2_with_endpoint():
     )
     qtt = QTT.ones(grid)
     assert abs(qtt.norm_l2() - 1.0) < 0.1
+
+
+def test_full_workflow():
+    """End-to-end: build, evaluate, arithmetic, integrate."""
+    import math
+
+    grid = GridSpec(variables=(UniformGrid(0, 2 * math.pi, 8),), layout="grouped")
+    N = 256
+    x = jnp.linspace(0, 2 * math.pi, N, endpoint=False)
+    sin_qtt = QTT.from_dense(jnp.sin(x), grid)
+    val = sin_qtt.evaluate((1.0,))
+    # Nearest-neighbor lookup on 256-point grid: dx ~ 0.025, so error ~ O(dx)
+    assert abs(val - math.sin(1.0)) < 0.02
+    doubled = sin_qtt + sin_qtt
+    assert abs(doubled.evaluate((1.0,)) - 2 * math.sin(1.0)) < 0.05
+    half = sin_qtt * 0.5
+    assert abs(half.evaluate((1.0,)) - 0.5 * math.sin(1.0)) < 0.02
+    integral = sin_qtt.integrate()
+    # Trapezoidal sum of sin over full period: should be ~0
+    assert abs(integral) < 1e-10

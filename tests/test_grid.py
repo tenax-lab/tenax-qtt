@@ -1,17 +1,18 @@
 """Tests for grid specifications and coordinate mappings."""
 
-import pytest
 import jax.numpy as jnp
+import pytest
+
 from tenax_qtt.grid import (
-    UniformGrid,
     GridSpec,
-    num_sites,
-    local_dim,
-    grid_to_sites,
-    sites_to_grid,
+    UniformGrid,
     batch_grid_to_sites,
     batch_sites_to_grid,
+    grid_to_sites,
+    local_dim,
+    num_sites,
     site_permutation,
+    sites_to_grid,
 )
 
 

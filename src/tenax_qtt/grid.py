@@ -7,7 +7,6 @@ from typing import Literal
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 
 
 @dataclass(frozen=True)
@@ -238,7 +237,6 @@ def site_permutation(source: GridSpec, target_layout: str) -> tuple[int, ...]:
                 offset += v.n_bits
             raise IndexError(f"Site {site} out of range")
         elif layout == "interleaved":
-            n = source.variables[0].n_bits
             level = site // d
             var_idx = site % d
             return (var_idx, level)

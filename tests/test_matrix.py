@@ -8,7 +8,6 @@ from tenax_qtt.grid import GridSpec, UniformGrid
 from tenax_qtt.matrix import QTTMatrix
 from tenax_qtt.qtt import QTT
 
-
 # ---------------------------------------------------------------------------
 # 6a: QTTMatrix dataclass, identity, and apply methods
 # ---------------------------------------------------------------------------
@@ -17,21 +16,21 @@ from tenax_qtt.qtt import QTT
 class TestIdentity:
     def test_identity_construction(self):
         grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
-        I = QTTMatrix.identity(grid)
-        assert I.grid_in == grid
-        assert I.grid_out == grid
-        assert len(I.site_tensors) == 4  # 4 bits => 4 sites
+        eye = QTTMatrix.identity(grid)
+        assert eye.grid_in == grid
+        assert eye.grid_out == grid
+        assert len(eye.site_tensors) == 4  # 4 bits => 4 sites
 
     def test_identity_site_tensor_shape(self):
         grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
-        I = QTTMatrix.identity(grid)
-        for W in I.site_tensors:
+        eye = QTTMatrix.identity(grid)
+        for W in eye.site_tensors:
             assert W.shape == (1, 2, 2, 1)
 
     def test_identity_to_dense(self):
         grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
-        I = QTTMatrix.identity(grid)
-        mat = I.to_dense()
+        eye = QTTMatrix.identity(grid)
+        mat = eye.to_dense()
         assert mat.shape == (16, 16)
         assert jnp.allclose(mat, jnp.eye(16), atol=1e-12)
 
@@ -39,9 +38,9 @@ class TestIdentity:
 class TestNaiveApply:
     def test_identity_apply_ones(self):
         grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
-        I = QTTMatrix.identity(grid)
+        eye = QTTMatrix.identity(grid)
         qtt = QTT.ones(grid)
-        result = I.apply(qtt, method="naive")
+        result = eye.apply(qtt, method="naive")
         assert jnp.allclose(result.to_dense(), 1.0, atol=1e-10)
 
     def test_identity_apply_linear(self):
@@ -49,8 +48,8 @@ class TestNaiveApply:
         N = 64
         x = jnp.linspace(0, 1, N, endpoint=False)
         qtt = fold_to_qtt(x, grid)
-        I = QTTMatrix.identity(grid)
-        result = I.apply(qtt, method="naive")
+        eye = QTTMatrix.identity(grid)
+        result = eye.apply(qtt, method="naive")
         assert jnp.allclose(result.to_dense(), x, atol=1e-6)
 
     def test_identity_preserves_values(self):
@@ -59,17 +58,17 @@ class TestNaiveApply:
         N = 16
         data = jnp.sin(jnp.linspace(0, 2 * jnp.pi, N, endpoint=False))
         qtt = fold_to_qtt(data, grid)
-        I = QTTMatrix.identity(grid)
-        result = I.apply(qtt, method="naive")
+        eye = QTTMatrix.identity(grid)
+        result = eye.apply(qtt, method="naive")
         assert jnp.allclose(result.to_dense(), data, atol=1e-6)
 
 
 class TestZipupApply:
     def test_identity_apply_ones(self):
         grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
-        I = QTTMatrix.identity(grid)
+        eye = QTTMatrix.identity(grid)
         qtt = QTT.ones(grid)
-        result = I.apply(qtt, method="zipup")
+        result = eye.apply(qtt, method="zipup")
         assert jnp.allclose(result.to_dense(), 1.0, atol=1e-10)
 
     def test_identity_apply_linear(self):
@@ -77,17 +76,17 @@ class TestZipupApply:
         N = 64
         x = jnp.linspace(0, 1, N, endpoint=False)
         qtt = fold_to_qtt(x, grid)
-        I = QTTMatrix.identity(grid)
-        result = I.apply(qtt, method="zipup")
+        eye = QTTMatrix.identity(grid)
+        result = eye.apply(qtt, method="zipup")
         assert jnp.allclose(result.to_dense(), x, atol=1e-6)
 
 
 class TestTCIApply:
     def test_identity_apply_ones(self):
         grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
-        I = QTTMatrix.identity(grid)
+        eye = QTTMatrix.identity(grid)
         qtt = QTT.ones(grid)
-        result = I.apply(qtt, method="tci", tol=1e-10, max_bond_dim=16)
+        result = eye.apply(qtt, method="tci", tol=1e-10, max_bond_dim=16)
         assert jnp.allclose(result.to_dense(), 1.0, atol=1e-4)
 
 
@@ -118,8 +117,8 @@ class TestFromDenseMatrix:
 class TestToDense:
     def test_identity_to_dense(self):
         grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
-        I = QTTMatrix.identity(grid)
-        mat = I.to_dense()
+        eye = QTTMatrix.identity(grid)
+        mat = eye.to_dense()
         assert mat.shape == (8, 8)
         assert jnp.allclose(mat, jnp.eye(8), atol=1e-12)
 
@@ -237,8 +236,8 @@ class TestApplyMethodsConsistency:
 class TestTranspose:
     def test_transpose_identity(self):
         grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
-        I = QTTMatrix.identity(grid)
-        It = I.transpose()
+        eye = QTTMatrix.identity(grid)
+        It = eye.transpose()
         qtt = QTT.ones(grid)
         result = It.apply(qtt, method="naive")
         assert jnp.allclose(result.to_dense(), 1.0, atol=1e-10)
@@ -246,9 +245,9 @@ class TestTranspose:
     def test_transpose_swaps_grids(self):
         grid_in = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
         grid_out = GridSpec(variables=(UniformGrid(0, 2, 3),), layout="grouped")
-        I = QTTMatrix.identity(grid_in)
+        eye = QTTMatrix.identity(grid_in)
         # Build a matrix with different in/out grids
-        M = QTTMatrix(site_tensors=I.site_tensors, grid_in=grid_in, grid_out=grid_out)
+        M = QTTMatrix(site_tensors=eye.site_tensors, grid_in=grid_in, grid_out=grid_out)
         Mt = M.transpose()
         assert Mt.grid_in == grid_out
         assert Mt.grid_out == grid_in
@@ -266,8 +265,8 @@ class TestTranspose:
 class TestCompose:
     def test_compose_identity(self):
         grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
-        I = QTTMatrix.identity(grid)
-        I2 = I.compose(I, method="naive")
+        eye = QTTMatrix.identity(grid)
+        I2 = eye.compose(eye, method="naive")
         qtt = QTT.ones(grid)
         result = I2.apply(qtt, method="naive")
         assert jnp.allclose(result.to_dense(), 1.0, atol=1e-10)
@@ -286,16 +285,16 @@ class TestCompose:
 
     def test_compose_unsupported_method(self):
         grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
-        I = QTTMatrix.identity(grid)
+        eye = QTTMatrix.identity(grid)
         with pytest.raises(NotImplementedError):
-            I.compose(I, method="zipup")
+            eye.compose(eye, method="zipup")
 
 
 class TestDunderMethods:
     def test_qttmatrix_add(self):
         grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
-        I = QTTMatrix.identity(grid)
-        two_I = I + I
+        eye = QTTMatrix.identity(grid)
+        two_I = eye + eye
         qtt = QTT.ones(grid)
         result = two_I.apply(qtt, method="naive")
         assert jnp.allclose(result.to_dense(), 2.0, atol=1e-10)
@@ -313,24 +312,24 @@ class TestDunderMethods:
 
     def test_qttmatrix_scalar_mul(self):
         grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
-        I = QTTMatrix.identity(grid)
-        scaled = I * 3.0
+        eye = QTTMatrix.identity(grid)
+        scaled = eye * 3.0
         qtt = QTT.ones(grid)
         result = scaled.apply(qtt, method="naive")
         assert jnp.allclose(result.to_dense(), 3.0, atol=1e-10)
 
     def test_qttmatrix_rmul(self):
         grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
-        I = QTTMatrix.identity(grid)
-        scaled = 5.0 * I
+        eye = QTTMatrix.identity(grid)
+        scaled = 5.0 * eye
         qtt = QTT.ones(grid)
         result = scaled.apply(qtt, method="naive")
         assert jnp.allclose(result.to_dense(), 5.0, atol=1e-10)
 
     def test_qttmatrix_sub(self):
         grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
-        I = QTTMatrix.identity(grid)
-        zero = I - I
+        eye = QTTMatrix.identity(grid)
+        zero = eye - eye
         qtt = QTT.ones(grid)
         result = zero.apply(qtt, method="naive")
         assert jnp.allclose(result.to_dense(), 0.0, atol=1e-10)

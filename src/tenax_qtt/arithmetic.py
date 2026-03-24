@@ -7,7 +7,6 @@ import numpy as np
 from tenax import DenseTensor, FlowDirection, TensorIndex, U1Symmetry, svd
 from tenax.core.mps import FiniteMPS
 
-from tenax_qtt.grid import GridSpec
 from tenax_qtt.qtt import QTT
 
 _sym = U1Symmetry()

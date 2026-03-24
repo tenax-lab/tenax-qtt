@@ -8,7 +8,6 @@ from tenax_qtt.cross import QTTResult, cross_interpolation, estimate_error
 from tenax_qtt.grid import GridSpec, UniformGrid
 from tenax_qtt.qtt import QTT
 
-
 # ---- TCI2 tests ----
 
 
@@ -113,7 +112,8 @@ def test_prrlu_vs_tci2_accuracy():
 def test_estimate_error_exact():
     """Error should be near zero for an exact representation."""
     grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
-    f = lambda x: 1.0
+    def f(x):
+        return 1.0
     result = cross_interpolation(f, grid, tol=1e-12, method="tci2")
     err = estimate_error(result.qtt, f, n_samples=100)
     assert err < 1e-8

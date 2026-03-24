@@ -18,7 +18,7 @@ _sym = U1Symmetry()
 
 def _flat_to_sites(flat_idx: int, grid: GridSpec) -> tuple[int, ...]:
     """Convert a flat row/column index to MPS site indices for multi-variable grids."""
-    from tenax_qtt.grid import _int_to_bits, grid_to_sites, _coord_to_index
+    from tenax_qtt.grid import grid_to_sites
 
     # Decompose flat index into per-variable indices
     var_indices = []
@@ -561,7 +561,6 @@ class QTTMatrix:
 
         if N_out * N_in <= 2**20:
             # Small enough: build dense matrix by evaluating f at all pairs
-            from tenax_qtt.grid import grid_to_sites as _g2s
 
             rows = []
             for i_out in range(N_out):
