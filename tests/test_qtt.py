@@ -13,6 +13,7 @@ from tenax_qtt.qtt import QTT
 def _make_trivial_index(dim, flow, label):
     """Helper: create a DenseTensor-compatible TensorIndex (no symmetry)."""
     from tenax import U1Symmetry
+
     sym = U1Symmetry()
     charges = np.zeros(dim, dtype=np.int32)
     return TensorIndex(sym, charges, flow, label=label)

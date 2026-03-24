@@ -48,9 +48,7 @@ def _evaluate_f(
     return vals
 
 
-def _build_mps_from_site_tensors(
-    site_tensors: list[np.ndarray], grid: GridSpec
-) -> QTT:
+def _build_mps_from_site_tensors(site_tensors: list[np.ndarray], grid: GridSpec) -> QTT:
     """Build a QTT from a list of numpy site tensors with proper tenax labels."""
     L = len(site_tensors)
     mps_tensors = []
@@ -273,9 +271,7 @@ def _tci_sweep(
     for k in range(L - 2, -1, -1):
         d = dims[k + 1]
         I_left = I_sets[k]
-        J_right: list[tuple[int, ...]] = (
-            [()] if k == L - 2 else J_sets[k + 1]
-        )
+        J_right: list[tuple[int, ...]] = [()] if k == L - 2 else J_sets[k + 1]
         n_il = len(I_left)
         n_jr = len(J_right)
 
@@ -331,12 +327,8 @@ def _enrich_pivots(
         existing_I = set(I_sets[k])
         existing_J = set(J_sets[k])
         for _ in range(chi_add * 10):  # try multiple times
-            left = tuple(
-                int(rng.integers(0, dims[j])) for j in range(k + 1)
-            )
-            right = tuple(
-                int(rng.integers(0, dims[j])) for j in range(k + 1, L)
-            )
+            left = tuple(int(rng.integers(0, dims[j])) for j in range(k + 1))
+            right = tuple(int(rng.integers(0, dims[j])) for j in range(k + 1, L))
             if left not in existing_I:
                 I_sets[k].append(left)
                 existing_I.add(left)
@@ -387,16 +379,12 @@ def _tci2(
         existing_l: set[tuple[int, ...]] = set()
         existing_r: set[tuple[int, ...]] = set()
         while len(left_pivots) < chi:
-            left = tuple(
-                int(rng.integers(0, dims[j])) for j in range(k + 1)
-            )
+            left = tuple(int(rng.integers(0, dims[j])) for j in range(k + 1))
             if left not in existing_l:
                 existing_l.add(left)
                 left_pivots.append(left)
         while len(right_pivots) < chi:
-            right = tuple(
-                int(rng.integers(0, dims[j])) for j in range(k + 1, L)
-            )
+            right = tuple(int(rng.integers(0, dims[j])) for j in range(k + 1, L))
             if right not in existing_r:
                 existing_r.add(right)
                 right_pivots.append(right)
@@ -409,9 +397,7 @@ def _tci2(
 
     for iteration in range(max_iter):
         # Pivot update sweep
-        ne = _tci_sweep(
-            f, grid, dims, I_sets, J_sets, tol, max_bond_dim, batch, rng
-        )
+        ne = _tci_sweep(f, grid, dims, I_sets, J_sets, tol, max_bond_dim, batch, rng)
         n_evals += ne
 
         # Build MPS
@@ -421,7 +407,7 @@ def _tci2(
         n_evals += ne
 
         # Convergence check
-        n_check = min(200, 2 ** L)
+        n_check = min(200, 2**L)
         check_err = 0.0
         qtt_tmp = _build_mps_from_site_tensors(site_tensors, grid)
         for _ in range(n_check):
@@ -486,16 +472,12 @@ def _prrlu(
         existing_l: set[tuple[int, ...]] = set()
         existing_r: set[tuple[int, ...]] = set()
         while len(left_pivots) < chi:
-            left = tuple(
-                int(rng.integers(0, dims[j])) for j in range(k + 1)
-            )
+            left = tuple(int(rng.integers(0, dims[j])) for j in range(k + 1))
             if left not in existing_l:
                 existing_l.add(left)
                 left_pivots.append(left)
         while len(right_pivots) < chi:
-            right = tuple(
-                int(rng.integers(0, dims[j])) for j in range(k + 1, L)
-            )
+            right = tuple(int(rng.integers(0, dims[j])) for j in range(k + 1, L))
             if right not in existing_r:
                 existing_r.add(right)
                 right_pivots.append(right)
@@ -510,9 +492,7 @@ def _prrlu(
         # Left-to-right with LU pivot selection
         for k in range(L - 1):
             d = dims[k]
-            I_left: list[tuple[int, ...]] = (
-                [()] if k == 0 else I_sets[k - 1]
-            )
+            I_left: list[tuple[int, ...]] = [()] if k == 0 else I_sets[k - 1]
             J_right = J_sets[k]
             n_il = len(I_left)
             n_jr = len(J_right)
@@ -573,9 +553,7 @@ def _prrlu(
         for k in range(L - 2, -1, -1):
             d = dims[k + 1]
             I_left = I_sets[k]
-            J_right_list: list[tuple[int, ...]] = (
-                [()] if k == L - 2 else J_sets[k + 1]
-            )
+            J_right_list: list[tuple[int, ...]] = [()] if k == L - 2 else J_sets[k + 1]
             n_il = len(I_left)
             n_jr = len(J_right_list)
 
@@ -613,7 +591,7 @@ def _prrlu(
         )
         n_evals += ne
 
-        n_check = min(200, 2 ** L)
+        n_check = min(200, 2**L)
         check_err = 0.0
         qtt_tmp = _build_mps_from_site_tensors(site_tensors, grid)
         for _ in range(n_check):
@@ -690,9 +668,7 @@ def cross_interpolation(
         Contains the approximating QTT and convergence diagnostics.
     """
     if method == "tci2":
-        return _tci2(
-            f, grid, tol, max_bond_dim, max_iter, batch, batch_size, seed
-        )
+        return _tci2(f, grid, tol, max_bond_dim, max_iter, batch, batch_size, seed)
     elif method == "prrlu":
         return _prrlu(
             f,

@@ -139,7 +139,7 @@ class QTTMatrix:
         tensor = matrix.reshape(dims_out + dims_in)
         perm = []
         for i in range(L):
-            perm.append(i)      # out index i
+            perm.append(i)  # out index i
             perm.append(L + i)  # in index i
         tensor = tensor.transpose(perm)
 
@@ -322,9 +322,7 @@ class QTTMatrix:
                 )
                 tensors.append(DenseTensor(site_data, indices))
 
-                vh_data = (
-                    Vh_t.todense() if hasattr(Vh_t, "todense") else Vh_t.data
-                )
+                vh_data = Vh_t.todense() if hasattr(Vh_t, "todense") else Vh_t.data
                 remainder = jnp.diag(s) @ vh_data  # (chi_new, chi_wr*chi_ar)
             else:
                 # Last site: no SVD, just store
@@ -334,13 +332,9 @@ class QTTMatrix:
                 if site_data.ndim == 2:
                     site_data = site_data.reshape(result.shape[0], d_out, 1)
                 indices = (
-                    _trivial_index(
-                        site_data.shape[0], FlowDirection.IN, left_label
-                    ),
+                    _trivial_index(site_data.shape[0], FlowDirection.IN, left_label),
                     _trivial_index(d_out, FlowDirection.IN, f"p{i}"),
-                    _trivial_index(
-                        site_data.shape[2], FlowDirection.OUT, right_label
-                    ),
+                    _trivial_index(site_data.shape[2], FlowDirection.OUT, right_label),
                 )
                 tensors.append(DenseTensor(site_data, indices))
 
@@ -549,7 +543,9 @@ class QTTMatrix:
         L_in = num_sites(grid_in)
         L_out = num_sites(grid_out)
         if L_in != L_out:
-            raise ValueError("from_cross requires same number of sites for grid_in and grid_out")
+            raise ValueError(
+                "from_cross requires same number of sites for grid_in and grid_out"
+            )
 
         # Compute total sizes
         N_out = 1
@@ -565,18 +561,18 @@ class QTTMatrix:
             rows = []
             for i_out in range(N_out):
                 # Convert flat index to site indices for the output grid
-                out_sites = tuple(
-                    _int_to_bits(i_out, grid_out.variables[0].n_bits)
-                ) if len(grid_out.variables) == 1 else _flat_to_sites(
-                    i_out, grid_out
+                out_sites = (
+                    tuple(_int_to_bits(i_out, grid_out.variables[0].n_bits))
+                    if len(grid_out.variables) == 1
+                    else _flat_to_sites(i_out, grid_out)
                 )
                 x_out = sites_to_grid(grid_out, out_sites)
                 row = []
                 for i_in in range(N_in):
-                    in_sites = tuple(
-                        _int_to_bits(i_in, grid_in.variables[0].n_bits)
-                    ) if len(grid_in.variables) == 1 else _flat_to_sites(
-                        i_in, grid_in
+                    in_sites = (
+                        tuple(_int_to_bits(i_in, grid_in.variables[0].n_bits))
+                        if len(grid_in.variables) == 1
+                        else _flat_to_sites(i_in, grid_in)
                     )
                     x_in = sites_to_grid(grid_in, in_sites)
                     row.append(complex(f(x_out, x_in)))

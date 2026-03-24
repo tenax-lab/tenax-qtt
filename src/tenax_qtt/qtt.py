@@ -100,9 +100,7 @@ class QTT:
         """Wrap an existing FiniteMPS with grid metadata."""
         L = num_sites(grid)
         if len(mps.tensors) != L:
-            raise ValueError(
-                f"MPS has {len(mps.tensors)} sites but grid requires {L}"
-            )
+            raise ValueError(f"MPS has {len(mps.tensors)} sites but grid requires {L}")
         return cls(mps=mps, grid=grid)
 
     @classmethod
@@ -167,9 +165,7 @@ class QTT:
     def evaluate_batch(self, xs: jax.Array) -> jax.Array:
         """Vectorized evaluation at multiple points."""
         vals = [
-            self.evaluate(
-                tuple(float(xs[i, j]) for j in range(xs.shape[1]))
-            )
+            self.evaluate(tuple(float(xs[i, j]) for j in range(xs.shape[1])))
             for i in range(xs.shape[0])
         ]
         return jnp.array(vals)

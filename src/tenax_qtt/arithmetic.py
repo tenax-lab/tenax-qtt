@@ -91,9 +91,7 @@ def recompress(
         svh = jnp.diag(s) @ vh_data  # (chi_new, chi_r_old)
 
         t_right = tensors[i + 1]
-        data_right = (
-            t_right.todense() if hasattr(t_right, "todense") else t_right.data
-        )
+        data_right = t_right.todense() if hasattr(t_right, "todense") else t_right.data
         _, d_r, chi_rr = data_right.shape
         new_right = jnp.einsum("kj,jlm->klm", svh, data_right)
 

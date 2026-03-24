@@ -47,7 +47,9 @@ def fold_to_qtt(
         mat_tensor = DenseTensor(mat, (left_idx, right_idx))
 
         U, s, Vh, _ = svd(
-            mat_tensor, ["left"], ["right"],
+            mat_tensor,
+            ["left"],
+            ["right"],
             new_bond_label="bond",
             max_singular_values=max_bond_dim,
             max_truncation_err=tol,

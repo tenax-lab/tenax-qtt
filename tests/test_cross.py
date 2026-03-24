@@ -28,9 +28,7 @@ def test_cross_linear():
 
 
 def test_cross_sin():
-    grid = GridSpec(
-        variables=(UniformGrid(0, 2 * math.pi, 8),), layout="grouped"
-    )
+    grid = GridSpec(variables=(UniformGrid(0, 2 * math.pi, 8),), layout="grouped")
     result = cross_interpolation(
         lambda x: math.sin(x[0]),
         grid,
@@ -48,9 +46,7 @@ def test_cross_sin():
 
 def test_cross_result_fields():
     grid = GridSpec(variables=(UniformGrid(0, 1, 6),), layout="grouped")
-    result = cross_interpolation(
-        lambda x: x[0] ** 2, grid, tol=1e-8, method="tci2"
-    )
+    result = cross_interpolation(lambda x: x[0] ** 2, grid, tol=1e-8, method="tci2")
     assert result.n_iter > 0
     assert result.n_function_evals > 0
     assert isinstance(result.estimated_error, float)
@@ -61,9 +57,7 @@ def test_cross_result_fields():
 
 def test_prrlu_constant():
     grid = GridSpec(variables=(UniformGrid(0, 1, 8),), layout="grouped")
-    result = cross_interpolation(
-        lambda x: 1.0, grid, tol=1e-10, method="prrlu"
-    )
+    result = cross_interpolation(lambda x: 1.0, grid, tol=1e-10, method="prrlu")
     assert isinstance(result, QTTResult)
     assert max(result.qtt.bond_dims) <= 2
 
@@ -83,9 +77,7 @@ def test_prrlu_polynomial():
 
 def test_prrlu_vs_tci2_accuracy():
     """prrLU should be at least as good as TCI2 on a smooth function."""
-    grid = GridSpec(
-        variables=(UniformGrid(0, 2 * math.pi, 10),), layout="grouped"
-    )
+    grid = GridSpec(variables=(UniformGrid(0, 2 * math.pi, 10),), layout="grouped")
     r1 = cross_interpolation(
         lambda x: math.sin(x[0]),
         grid,
@@ -112,8 +104,10 @@ def test_prrlu_vs_tci2_accuracy():
 def test_estimate_error_exact():
     """Error should be near zero for an exact representation."""
     grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
+
     def f(x):
         return 1.0
+
     result = cross_interpolation(f, grid, tol=1e-12, method="tci2")
     err = estimate_error(result.qtt, f, n_samples=100)
     assert err < 1e-8
@@ -124,9 +118,7 @@ def test_estimate_error_exact():
 
 def test_from_cross():
     grid = GridSpec(variables=(UniformGrid(0, 1, 8),), layout="grouped")
-    result = QTT.from_cross(
-        lambda x: x[0] ** 2, grid, tol=1e-6, method="tci2"
-    )
+    result = QTT.from_cross(lambda x: x[0] ** 2, grid, tol=1e-6, method="tci2")
     assert isinstance(result, QTTResult)
     assert abs(result.qtt.evaluate((0.5,)) - 0.25) < 1e-3
 

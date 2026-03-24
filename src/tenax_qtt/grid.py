@@ -114,7 +114,9 @@ def grid_to_sites(grid: GridSpec, x: tuple[float, ...]) -> tuple[int, ...]:
         raise ValueError(f"Expected {d} coordinates, got {len(x)}")
 
     indices = [_coord_to_index(grid.variables[i], x[i]) for i in range(d)]
-    bits_per_var = [_int_to_bits(indices[i], grid.variables[i].n_bits) for i in range(d)]
+    bits_per_var = [
+        _int_to_bits(indices[i], grid.variables[i].n_bits) for i in range(d)
+    ]
 
     if grid.layout == "grouped":
         sites: list[int] = []
