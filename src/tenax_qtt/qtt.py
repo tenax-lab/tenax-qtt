@@ -1,0 +1,101 @@
+"""QTT class wrapping FiniteMPS with grid semantics."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+import jax
+import jax.numpy as jnp
+import numpy as np
+from tenax import DenseTensor, FlowDirection, TensorIndex, U1Symmetry
+from tenax.core.mps import FiniteMPS
+
+from tenax_qtt.grid import GridSpec, local_dim, num_sites
+
+if TYPE_CHECKING:
+    from tenax import Tensor
+
+
+def _trivial_index(dim: int, flow: FlowDirection, label: str) -> TensorIndex:
+    sym = U1Symmetry()
+    charges = np.zeros(dim, dtype=np.int32)
+    return TensorIndex(sym, charges, flow, label=label)
+
+
+def _make_constant_mps(grid: GridSpec, value: float) -> FiniteMPS:
+    """Build a bond-dim-1 MPS with constant value at all grid points."""
+    L = num_sites(grid)
+    tensors = []
+    for i in range(L):
+        d = local_dim(grid, i)
+        # Distribute the constant across sites: first site gets value, rest get 1
+        fill = value if i == 0 else 1.0
+        data = jnp.full((1, d, 1), fill)
+        left_label = f"v_{i - 1}_{i}" if i == 0 else f"v{i - 1}_{i}"
+        right_label = f"v{i}_{i + 1}"
+        indices = (
+            _trivial_index(1, FlowDirection.IN, left_label),
+            _trivial_index(d, FlowDirection.IN, f"p{i}"),
+            _trivial_index(1, FlowDirection.OUT, right_label),
+        )
+        tensors.append(DenseTensor(data, indices))
+    return FiniteMPS.from_tensors(tensors)
+
+
+@dataclass(frozen=True)
+class QTT:
+    """Quantic Tensor Train: a function on a grid stored as an MPS."""
+
+    mps: FiniteMPS
+    grid: GridSpec
+
+    # -- MPS delegation --
+
+    @property
+    def tensors(self) -> list[Tensor]:
+        return self.mps.tensors
+
+    @property
+    def bond_dims(self) -> list[int]:
+        return self.mps.bond_dims
+
+    @property
+    def orth_center(self) -> int | None:
+        return self.mps.orth_center
+
+    @property
+    def singular_values(self) -> list:
+        return self.mps.singular_values
+
+    @property
+    def log_norm(self) -> float:
+        return self.mps.log_norm
+
+    def canonicalize(self, center: int) -> QTT:
+        return QTT(mps=self.mps.canonicalize(center), grid=self.grid)
+
+    def norm(self) -> float:
+        return self.mps.norm()
+
+    # -- Constructors --
+
+    @classmethod
+    def from_mps(cls, mps: FiniteMPS, grid: GridSpec) -> QTT:
+        """Wrap an existing FiniteMPS with grid metadata."""
+        L = num_sites(grid)
+        if len(mps.tensors) != L:
+            raise ValueError(
+                f"MPS has {len(mps.tensors)} sites but grid requires {L}"
+            )
+        return cls(mps=mps, grid=grid)
+
+    @classmethod
+    def zeros(cls, grid: GridSpec) -> QTT:
+        """Bond-dim-1 QTT representing the zero function."""
+        return cls(mps=_make_constant_mps(grid, 0.0), grid=grid)
+
+    @classmethod
+    def ones(cls, grid: GridSpec) -> QTT:
+        """Bond-dim-1 QTT representing f(x) = 1."""
+        return cls(mps=_make_constant_mps(grid, 1.0), grid=grid)

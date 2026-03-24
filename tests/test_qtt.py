@@ -1,0 +1,63 @@
+"""Tests for QTT class."""
+
+import jax.numpy as jnp
+import numpy as np
+import jax
+from tenax import DenseTensor, TensorIndex, FlowDirection
+from tenax.core.mps import FiniteMPS
+from tenax_qtt.grid import UniformGrid, GridSpec
+from tenax_qtt.qtt import QTT
+
+
+def _make_trivial_index(dim, flow, label):
+    """Helper: create a DenseTensor-compatible TensorIndex (no symmetry)."""
+    from tenax import U1Symmetry
+    sym = U1Symmetry()
+    charges = np.zeros(dim, dtype=np.int32)
+    return TensorIndex(sym, charges, flow, label=label)
+
+
+def _make_bond_dim1_mps(n_sites, local_dims, value=1.0):
+    """Helper: build a bond-dim-1 FiniteMPS with constant site tensors."""
+    tensors = []
+    for i in range(n_sites):
+        d = local_dims[i]
+        data = jnp.full((1, d, 1), value / n_sites if i == 0 else 1.0)
+        left_label = f"v_{i - 1}_{i}" if i == 0 else f"v{i - 1}_{i}"
+        right_label = f"v{i}_{i + 1}"
+        indices = (
+            _make_trivial_index(1, FlowDirection.IN, left_label),
+            _make_trivial_index(d, FlowDirection.IN, f"p{i}"),
+            _make_trivial_index(1, FlowDirection.OUT, right_label),
+        )
+        tensors.append(DenseTensor(data, indices))
+    return FiniteMPS.from_tensors(tensors)
+
+
+def test_qtt_from_mps():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+    mps = _make_bond_dim1_mps(3, [2, 2, 2])
+    qtt = QTT(mps=mps, grid=grid)
+    assert qtt.grid == grid
+    assert len(qtt.tensors) == 3
+
+
+def test_qtt_bond_dims():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+    mps = _make_bond_dim1_mps(3, [2, 2, 2])
+    qtt = QTT(mps=mps, grid=grid)
+    assert qtt.bond_dims == [1, 1]
+
+
+def test_qtt_zeros():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
+    qtt = QTT.zeros(grid)
+    assert len(qtt.tensors) == 4
+    assert all(bd == 1 for bd in qtt.bond_dims)
+
+
+def test_qtt_ones():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
+    qtt = QTT.ones(grid)
+    assert len(qtt.tensors) == 4
+    assert all(bd == 1 for bd in qtt.bond_dims)
