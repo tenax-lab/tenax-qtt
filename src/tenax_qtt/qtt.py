@@ -78,6 +78,21 @@ class QTT:
     def norm(self) -> float:
         return self.mps.norm()
 
+    def left_canonicalize(self) -> QTT:
+        return QTT(mps=self.mps.left_canonicalize(), grid=self.grid)
+
+    def right_canonicalize(self) -> QTT:
+        return QTT(mps=self.mps.right_canonicalize(), grid=self.grid)
+
+    def overlap(self, other: QTT) -> complex:
+        return self.mps.overlap(other.mps)
+
+    def entanglement_entropy(self, bond: int) -> float:
+        return self.mps.entanglement_entropy(bond)
+
+    def compute_singular_values(self) -> QTT:
+        return QTT(mps=self.mps.compute_singular_values(), grid=self.grid)
+
     # -- Constructors --
 
     @classmethod

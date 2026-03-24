@@ -141,3 +141,32 @@ def test_partial_integrate_2d():
     result = qtt.integrate(variables=[1])
     assert isinstance(result, QTT)
     assert abs(result.evaluate((0.5,)) - 1.0) < 1e-10
+
+
+def test_qtt_left_canonicalize():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
+    qtt = QTT.ones(grid)
+    lc = qtt.left_canonicalize()
+    assert isinstance(lc, QTT)
+
+
+def test_qtt_right_canonicalize():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
+    qtt = QTT.ones(grid)
+    rc = qtt.right_canonicalize()
+    assert isinstance(rc, QTT)
+
+
+def test_qtt_overlap():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
+    a = QTT.ones(grid)
+    b = QTT.ones(grid)
+    ov = a.overlap(b)
+    assert abs(ov - 16.0) < 1e-10
+
+
+def test_qtt_entanglement_entropy():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
+    qtt = QTT.ones(grid).canonicalize(2)
+    ee = qtt.entanglement_entropy(1)
+    assert abs(ee) < 1e-10
