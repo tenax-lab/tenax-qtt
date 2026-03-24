@@ -39,14 +39,14 @@ jobs:
 
       - name: Run linter
         run: |
-          uv run ruff check src/ tests/ --select E,F,UP
-          uv run ruff format --check src/ tests/
+          .venv/bin/ruff check src/ tests/ --select E,F,UP
+          .venv/bin/ruff format --check src/ tests/
 
       - name: Run core tests
         env:
           JAX_PLATFORMS: cpu
         run: |
-          uv run pytest tests/ -m "core" \
+          .venv/bin/pytest tests/ -m "core" \
             --cov=tenax_qtt \
             --cov-report=xml \
             --cov-report=term-missing \
@@ -87,7 +87,7 @@ jobs:
         env:
           JAX_PLATFORMS: cpu
         run: |
-          uv run pytest tests/ \
+          .venv/bin/pytest tests/ \
             --cov=tenax_qtt \
             --cov-report=xml \
             --cov-report=term-missing \
@@ -123,7 +123,7 @@ jobs:
         env:
           JAX_PLATFORMS: cpu
         run: |
-          uv run pytest tests/ -m "core" \
+          .venv/bin/pytest tests/ -m "core" \
             --cov=tenax_qtt \
             --cov-report=term-missing \
             -v
@@ -159,7 +159,7 @@ jobs:
         env:
           JAX_PLATFORMS: cpu
         run: |
-          uv run pytest tests/ \
+          .venv/bin/pytest tests/ \
             --cov=tenax_qtt \
             --cov-report=term-missing \
             -v
