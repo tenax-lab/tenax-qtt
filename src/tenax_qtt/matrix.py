@@ -367,6 +367,113 @@ class QTTMatrix:
         )
         return result.qtt
 
+    # -- Transpose, compose, arithmetic --
+
+    def transpose(self) -> QTTMatrix:
+        """Swap input and output physical legs."""
+        new_tensors = []
+        for W in self.site_tensors:
+            W = jnp.array(W)
+            # W: (chi_l, d_out, d_in, chi_r) -> swap d_out and d_in
+            new_tensors.append(jnp.transpose(W, (0, 2, 1, 3)))
+        return QTTMatrix(
+            site_tensors=new_tensors,
+            grid_in=self.grid_out,
+            grid_out=self.grid_in,
+        )
+
+    def compose(
+        self,
+        other: QTTMatrix,
+        method: Literal["tci", "naive", "zipup"] = "naive",
+        tol: float = 1e-8,
+        max_bond_dim: int = 64,
+    ) -> QTTMatrix:
+        """MPO x MPO composition: ``self @ other``.
+
+        Parameters
+        ----------
+        other : QTTMatrix
+            The right-hand operator.
+        method : {"naive", "zipup", "tci"}
+            Composition algorithm.  Only ``"naive"`` is currently implemented.
+        tol : float
+            Truncation tolerance (reserved for future methods).
+        max_bond_dim : int
+            Maximum bond dimension (reserved for future methods).
+
+        Returns
+        -------
+        QTTMatrix
+            Result of ``self @ other``.
+        """
+        if method != "naive":
+            raise NotImplementedError(
+                f"compose method '{method}' not yet implemented, use 'naive'"
+            )
+        L = len(self.site_tensors)
+        tensors = []
+        for i in range(L):
+            A = jnp.array(self.site_tensors[i])  # (chi_al, d_out, d_mid, chi_ar)
+            B = jnp.array(other.site_tensors[i])  # (chi_bl, d_mid, d_in, chi_br)
+            chi_al, d_out, _d_mid, chi_ar = A.shape
+            chi_bl, _d_mid2, d_in, chi_br = B.shape
+            # Contract over d_mid:
+            # C[al,bl, d_out, d_in, ar,br] = sum_m A[al,o,m,ar] * B[bl,m,i,br]
+            C = jnp.einsum("aomr,bmis->aboirs", A, B)
+            C = C.reshape(chi_al * chi_bl, d_out, d_in, chi_ar * chi_br)
+            tensors.append(C)
+        return QTTMatrix(
+            site_tensors=tensors,
+            grid_in=other.grid_in,
+            grid_out=self.grid_out,
+        )
+
+    def __add__(self, other: QTTMatrix) -> QTTMatrix:
+        """Direct sum of MPO bond dimensions."""
+        L = len(self.site_tensors)
+        tensors = []
+        for i in range(L):
+            A = jnp.array(self.site_tensors[i])
+            B = jnp.array(other.site_tensors[i])
+            chi_al, do, di, chi_ar = A.shape
+            chi_bl, _, _, chi_br = B.shape
+            if i == 0:
+                # First site: concatenate along right bond
+                new = jnp.concatenate([A, B], axis=3)
+            elif i == L - 1:
+                # Last site: concatenate along left bond
+                new = jnp.concatenate([A, B], axis=0)
+            else:
+                # Middle sites: block diagonal
+                new = jnp.zeros((chi_al + chi_bl, do, di, chi_ar + chi_br))
+                new = new.at[:chi_al, :, :, :chi_ar].set(A)
+                new = new.at[chi_al:, :, :, chi_ar:].set(B)
+            tensors.append(new)
+        return QTTMatrix(
+            site_tensors=tensors,
+            grid_in=self.grid_in,
+            grid_out=self.grid_out,
+        )
+
+    def __sub__(self, other: QTTMatrix) -> QTTMatrix:
+        """Subtract: ``self - other``."""
+        return self + (other * -1.0)
+
+    def __mul__(self, scalar: complex) -> QTTMatrix:
+        """Scalar multiplication (right): ``M * c``."""
+        tensors = list(self.site_tensors)
+        tensors[0] = jnp.array(tensors[0]) * scalar
+        return QTTMatrix(
+            site_tensors=tensors,
+            grid_in=self.grid_in,
+            grid_out=self.grid_out,
+        )
+
+    def __rmul__(self, scalar: complex) -> QTTMatrix:
+        """Scalar multiplication (left): ``c * M``."""
+        return self.__mul__(scalar)
+
     # -- Dense expansion --
 
     def to_dense(self) -> jnp.ndarray:

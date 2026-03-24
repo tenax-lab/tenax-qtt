@@ -227,3 +227,110 @@ class TestApplyMethodsConsistency:
         result_naive = D.apply(qtt, method="naive").to_dense()
         result_zipup = D.apply(qtt, method="zipup").to_dense()
         assert jnp.allclose(result_naive, result_zipup, atol=1e-4)
+
+
+# ---------------------------------------------------------------------------
+# 11a: transpose, compose, dunder methods
+# ---------------------------------------------------------------------------
+
+
+class TestTranspose:
+    def test_transpose_identity(self):
+        grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
+        I = QTTMatrix.identity(grid)
+        It = I.transpose()
+        qtt = QTT.ones(grid)
+        result = It.apply(qtt, method="naive")
+        assert jnp.allclose(result.to_dense(), 1.0, atol=1e-10)
+
+    def test_transpose_swaps_grids(self):
+        grid_in = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+        grid_out = GridSpec(variables=(UniformGrid(0, 2, 3),), layout="grouped")
+        I = QTTMatrix.identity(grid_in)
+        # Build a matrix with different in/out grids
+        M = QTTMatrix(site_tensors=I.site_tensors, grid_in=grid_in, grid_out=grid_out)
+        Mt = M.transpose()
+        assert Mt.grid_in == grid_out
+        assert Mt.grid_out == grid_in
+
+    def test_transpose_dense_roundtrip(self):
+        """Transpose of a dense matrix should match np transpose."""
+        grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+        N = 8
+        mat = jnp.arange(N * N, dtype=float).reshape(N, N)
+        M = QTTMatrix._from_dense_matrix(mat, grid, grid)
+        Mt = M.transpose()
+        assert jnp.allclose(Mt.to_dense(), mat.T, atol=1e-8)
+
+
+class TestCompose:
+    def test_compose_identity(self):
+        grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
+        I = QTTMatrix.identity(grid)
+        I2 = I.compose(I, method="naive")
+        qtt = QTT.ones(grid)
+        result = I2.apply(qtt, method="naive")
+        assert jnp.allclose(result.to_dense(), 1.0, atol=1e-10)
+
+    def test_compose_dense_product(self):
+        """Compose two dense-folded matrices and check against matmul."""
+        grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+        N = 8
+        A = jnp.eye(N) * 2.0
+        B = jnp.eye(N) * 3.0
+        MA = QTTMatrix._from_dense_matrix(A, grid, grid)
+        MB = QTTMatrix._from_dense_matrix(B, grid, grid)
+        MC = MA.compose(MB, method="naive")
+        expected = A @ B
+        assert jnp.allclose(MC.to_dense(), expected, atol=1e-8)
+
+    def test_compose_unsupported_method(self):
+        grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+        I = QTTMatrix.identity(grid)
+        with pytest.raises(NotImplementedError):
+            I.compose(I, method="zipup")
+
+
+class TestDunderMethods:
+    def test_qttmatrix_add(self):
+        grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
+        I = QTTMatrix.identity(grid)
+        two_I = I + I
+        qtt = QTT.ones(grid)
+        result = two_I.apply(qtt, method="naive")
+        assert jnp.allclose(result.to_dense(), 2.0, atol=1e-10)
+
+    def test_qttmatrix_add_dense(self):
+        """(A + B).to_dense() should equal A.to_dense() + B.to_dense()."""
+        grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+        N = 8
+        A_mat = jnp.eye(N) * 2.0
+        B_mat = jnp.diag(jnp.arange(N, dtype=float))
+        MA = QTTMatrix._from_dense_matrix(A_mat, grid, grid)
+        MB = QTTMatrix._from_dense_matrix(B_mat, grid, grid)
+        MC = MA + MB
+        assert jnp.allclose(MC.to_dense(), A_mat + B_mat, atol=1e-8)
+
+    def test_qttmatrix_scalar_mul(self):
+        grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
+        I = QTTMatrix.identity(grid)
+        scaled = I * 3.0
+        qtt = QTT.ones(grid)
+        result = scaled.apply(qtt, method="naive")
+        assert jnp.allclose(result.to_dense(), 3.0, atol=1e-10)
+
+    def test_qttmatrix_rmul(self):
+        grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
+        I = QTTMatrix.identity(grid)
+        scaled = 5.0 * I
+        qtt = QTT.ones(grid)
+        result = scaled.apply(qtt, method="naive")
+        assert jnp.allclose(result.to_dense(), 5.0, atol=1e-10)
+
+    def test_qttmatrix_sub(self):
+        grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
+        I = QTTMatrix.identity(grid)
+        zero = I - I
+        qtt = QTT.ones(grid)
+        result = zero.apply(qtt, method="naive")
+        assert jnp.allclose(result.to_dense(), 0.0, atol=1e-10)
