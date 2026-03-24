@@ -170,3 +170,12 @@ def test_qtt_entanglement_entropy():
     qtt = QTT.ones(grid).canonicalize(2)
     ee = qtt.entanglement_entropy(1)
     assert abs(ee) < 1e-10
+
+
+def test_norm_l2_with_endpoint():
+    grid = GridSpec(
+        variables=(UniformGrid(0, 1, 3, include_endpoint=True),),
+        layout="grouped",
+    )
+    qtt = QTT.ones(grid)
+    assert abs(qtt.norm_l2() - 1.0) < 0.1

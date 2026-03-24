@@ -329,9 +329,8 @@ class QTT:
 
     def norm_l2(self) -> float:
         """Continuous L2 norm: sqrt(integral |f(x)|^2 dx)."""
-        # For a real-valued QTT, ||f||^2 = <MPS|MPS> * dx
-        total_dx = 1.0
-        for v in self.grid.variables:
-            total_dx *= v.dx
-        mps_norm_sq = self.mps.norm() ** 2
-        return float(jnp.sqrt(mps_norm_sq * total_dx))
+        from tenax_qtt.arithmetic import hadamard
+
+        f_sq = hadamard(self, self)
+        integral = f_sq.integrate()
+        return float(jnp.sqrt(jnp.abs(integral)))
