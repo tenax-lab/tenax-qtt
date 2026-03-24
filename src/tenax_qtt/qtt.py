@@ -125,3 +125,56 @@ class QTT:
             for i in range(xs.shape[0])
         ]
         return jnp.array(vals)
+
+    # -- Dense expansion --
+
+    def to_dense(self) -> jax.Array:
+        """Expand QTT to full dense array."""
+        result = None
+        for i, t in enumerate(self.tensors):
+            data = t.todense() if hasattr(t, "todense") else t.data
+            if result is None:
+                # shape: (1, d, chi_right) -> (d, chi_right)
+                result = data[0]
+            else:
+                # result: (..., chi_left), data: (chi_left, d, chi_right)
+                result = jnp.tensordot(result, data, axes=([-1], [0]))
+        # Remove trailing dim-1 bond
+        return result.reshape(-1)
+
+    # -- Summation and integration --
+
+    def sum(self, variables: list[int] | None = None) -> QTT | complex:
+        """Sum over specified variables (or all) without grid spacing."""
+        if variables is not None:
+            raise NotImplementedError("Partial summation not yet implemented")
+        # Full sum: contract each site with all-ones vector
+        result = jnp.array([[1.0]])
+        for t in self.tensors:
+            data = t.todense() if hasattr(t, "todense") else t.data
+            d = data.shape[1]
+            ones = jnp.ones(d)
+            # Contract physical index with ones: (chi_l, d, chi_r) . (d,) -> (chi_l, chi_r)
+            contracted = jnp.einsum("ijk,j->ik", data, ones)
+            result = result @ contracted
+        return complex(result[0, 0])
+
+    def integrate(self, variables: list[int] | None = None) -> QTT | complex:
+        """Integrate over specified variables using trapezoidal quadrature."""
+        if variables is not None:
+            raise NotImplementedError("Partial integration not yet implemented")
+        # Full integration: sum * product of dx for each variable
+        total_dx = 1.0
+        for v in self.grid.variables:
+            total_dx *= v.dx
+        s = self.sum()
+        return s * total_dx
+
+    def norm_l2(self) -> float:
+        """Continuous L2 norm: sqrt(integral |f(x)|^2 dx)."""
+        # For a real-valued QTT, ||f||^2 = <MPS|MPS> * dx
+        total_dx = 1.0
+        for v in self.grid.variables:
+            total_dx *= v.dx
+        mps_norm_sq = self.mps.norm() ** 2
+        return float(jnp.sqrt(mps_norm_sq * total_dx))

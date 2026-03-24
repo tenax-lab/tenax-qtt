@@ -85,3 +85,33 @@ def test_qtt_evaluate_batch():
     vals = qtt.evaluate_batch(xs)
     assert vals.shape == (4,)
     assert jnp.allclose(vals, 1.0, atol=1e-12)
+
+
+def test_qtt_to_dense_ones():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+    qtt = QTT.ones(grid)
+    dense = qtt.to_dense()
+    assert dense.shape == (8,)  # 2^3
+    assert jnp.allclose(dense, 1.0, atol=1e-12)
+
+
+def test_qtt_sum_all():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+    qtt = QTT.ones(grid)
+    s = qtt.sum()
+    assert abs(s - 8.0) < 1e-12  # 2^3 grid points, all value 1
+
+
+def test_qtt_integrate_all():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+    qtt = QTT.ones(grid)
+    # integral of f(x)=1 on [0,1) with 8 points, dx=0.125 -> 1.0
+    result = qtt.integrate()
+    assert abs(result - 1.0) < 1e-12
+
+
+def test_qtt_norm_l2():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+    qtt = QTT.ones(grid)
+    # L2 norm of f(x)=1 on [0,1) = sqrt(1) = 1
+    assert abs(qtt.norm_l2() - 1.0) < 1e-10
