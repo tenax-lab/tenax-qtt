@@ -99,3 +99,29 @@ class QTT:
     def ones(cls, grid: GridSpec) -> QTT:
         """Bond-dim-1 QTT representing f(x) = 1."""
         return cls(mps=_make_constant_mps(grid, 1.0), grid=grid)
+
+    # -- Evaluation --
+
+    def evaluate(self, x: tuple[float, ...]) -> complex:
+        """Evaluate QTT at a single continuous-domain point."""
+        from tenax_qtt.grid import grid_to_sites
+
+        sites = grid_to_sites(self.grid, x)
+        # Contract MPS by selecting physical index at each site
+        result = jnp.array([[1.0]])  # row vector (1, 1)
+        for i, t in enumerate(self.tensors):
+            # t has shape (chi_left, d_phys, chi_right) as a dense array
+            data = t.todense() if hasattr(t, "todense") else t.data
+            s = sites[i]
+            result = result @ data[:, s, :]
+        return complex(result[0, 0])
+
+    def evaluate_batch(self, xs: jax.Array) -> jax.Array:
+        """Vectorized evaluation at multiple points."""
+        vals = [
+            self.evaluate(
+                tuple(float(xs[i, j]) for j in range(xs.shape[1]))
+            )
+            for i in range(xs.shape[0])
+        ]
+        return jnp.array(vals)

@@ -61,3 +61,27 @@ def test_qtt_ones():
     qtt = QTT.ones(grid)
     assert len(qtt.tensors) == 4
     assert all(bd == 1 for bd in qtt.bond_dims)
+
+
+def test_qtt_ones_evaluate():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+    qtt = QTT.ones(grid)
+    # f(x) = 1 everywhere
+    assert abs(qtt.evaluate((0.0,)) - 1.0) < 1e-12
+    assert abs(qtt.evaluate((0.5,)) - 1.0) < 1e-12
+
+
+def test_qtt_zeros_evaluate():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+    qtt = QTT.zeros(grid)
+    assert abs(qtt.evaluate((0.0,))) < 1e-12
+    assert abs(qtt.evaluate((0.5,))) < 1e-12
+
+
+def test_qtt_evaluate_batch():
+    grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+    qtt = QTT.ones(grid)
+    xs = jnp.array([[0.0], [0.25], [0.5], [0.75]])
+    vals = qtt.evaluate_batch(xs)
+    assert vals.shape == (4,)
+    assert jnp.allclose(vals, 1.0, atol=1e-12)
