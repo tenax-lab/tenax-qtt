@@ -170,6 +170,26 @@ class QTT:
         s = self.sum()
         return s * total_dx
 
+    # -- Arithmetic dunders --
+
+    def __add__(self, other: QTT) -> QTT:
+        from tenax_qtt.arithmetic import add
+
+        return add(self, other)
+
+    def __sub__(self, other: QTT) -> QTT:
+        from tenax_qtt.arithmetic import subtract
+
+        return subtract(self, other)
+
+    def __mul__(self, scalar: complex) -> QTT:
+        from tenax_qtt.arithmetic import scalar_multiply
+
+        return scalar_multiply(self, scalar)
+
+    def __rmul__(self, scalar: complex) -> QTT:
+        return self.__mul__(scalar)
+
     def norm_l2(self) -> float:
         """Continuous L2 norm: sqrt(integral |f(x)|^2 dx)."""
         # For a real-valued QTT, ||f||^2 = <MPS|MPS> * dx
