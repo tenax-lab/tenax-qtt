@@ -40,7 +40,9 @@ jobs:
           uv pip install pytest pytest-cov ruff mypy
 
       - name: Run linter
-        run: uv run ruff check src/ tests/
+        run: |
+          uv run ruff check src/ tests/ --select E,F,UP
+          uv run ruff format --check src/ tests/
 
       - name: Run core tests
         env:
