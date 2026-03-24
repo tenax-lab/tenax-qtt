@@ -69,5 +69,6 @@ python_version = "3.11"
 ignore_missing_imports = true
 strict = false
 
-[tool.uv.sources]
-tenax-tn = { git = "https://github.com/tenax-lab/tenax.git", branch = "main" }
+# For local development, uncomment:
+# [tool.uv.sources]
+# tenax-tn = { path = "../tenax", editable = true }
