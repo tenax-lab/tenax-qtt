@@ -26,11 +26,11 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Install tenax from GitHub
-        run: uv pip install "tenax-tn @ git+https://github.com/tenax-lab/tenax.git"
-
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: |
+          uv venv
+          uv pip install "tenax-tn @ git+https://github.com/tenax-lab/tenax.git"
+          uv sync --extra dev
 
       - name: Run linter
         run: uv run ruff check src/ tests/
@@ -65,11 +65,11 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Install tenax from GitHub
-        run: uv pip install "tenax-tn @ git+https://github.com/tenax-lab/tenax.git"
-
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: |
+          uv venv
+          uv pip install "tenax-tn @ git+https://github.com/tenax-lab/tenax.git"
+          uv sync --extra dev
 
       - name: Run all tests
         env:
@@ -96,11 +96,11 @@ jobs:
       - name: Set up Python 3.12
         run: uv python install 3.12
 
-      - name: Install tenax from GitHub
-        run: uv pip install "tenax-tn @ git+https://github.com/tenax-lab/tenax.git"
-
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: |
+          uv venv
+          uv pip install "tenax-tn @ git+https://github.com/tenax-lab/tenax.git"
+          uv sync --extra dev
 
       - name: Run core tests
         env:
@@ -127,11 +127,11 @@ jobs:
       - name: Set up Python 3.12
         run: uv python install 3.12
 
-      - name: Install tenax from GitHub
-        run: uv pip install "tenax-tn @ git+https://github.com/tenax-lab/tenax.git"
-
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: |
+          uv venv
+          uv pip install "tenax-tn @ git+https://github.com/tenax-lab/tenax.git"
+          uv sync --extra dev
 
       - name: Run all tests
         env:
