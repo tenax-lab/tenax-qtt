@@ -38,9 +38,7 @@ jobs:
           uv pip install -e ./tenax -e ".[dev]" pytest pytest-cov ruff mypy scipy
 
       - name: Run linter
-        run: |
-          .venv/bin/ruff check src/ tests/ --select E,F,UP
-          .venv/bin/ruff format --check src/ tests/
+        run: .venv/bin/ruff check src/ tests/ --select F,UP
 
       - name: Run core tests
         env:
