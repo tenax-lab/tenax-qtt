@@ -49,6 +49,119 @@ class QTTMatrix:
             tensors.append(data)
         return cls(site_tensors=tensors, grid_in=grid, grid_out=grid)
 
+    @classmethod
+    def derivative_1d(cls, grid: GridSpec) -> QTTMatrix:
+        """First derivative operator using central finite differences.
+
+        D[i,j] = (delta_{i,j+1} - delta_{i,j-1}) / (2*dx)
+        """
+        if len(grid.variables) != 1:
+            raise ValueError("derivative_1d requires a 1D grid")
+        v = grid.variables[0]
+        N = v.n_points
+        dx = v.dx
+
+        # Build full matrix then fold
+        D = jnp.zeros((N, N))
+        for i in range(N):
+            if i > 0:
+                D = D.at[i, i - 1].set(-1.0 / (2 * dx))
+            if i < N - 1:
+                D = D.at[i, i + 1].set(1.0 / (2 * dx))
+        return cls._from_dense_matrix(D, grid, grid)
+
+    @classmethod
+    def laplacian_1d(cls, grid: GridSpec) -> QTTMatrix:
+        """Second derivative (Laplacian) using central finite differences.
+
+        L[i,j] = (delta_{i,j-1} - 2*delta_{i,j} + delta_{i,j+1}) / dx^2
+        """
+        if len(grid.variables) != 1:
+            raise ValueError("laplacian_1d requires a 1D grid")
+        v = grid.variables[0]
+        N = v.n_points
+        dx = v.dx
+
+        L = jnp.zeros((N, N))
+        for i in range(N):
+            L = L.at[i, i].set(-2.0 / dx**2)
+            if i > 0:
+                L = L.at[i, i - 1].set(1.0 / dx**2)
+            if i < N - 1:
+                L = L.at[i, i + 1].set(1.0 / dx**2)
+        return cls._from_dense_matrix(L, grid, grid)
+
+    @classmethod
+    def _from_dense_matrix(
+        cls,
+        matrix: jnp.ndarray,
+        grid_in: GridSpec,
+        grid_out: GridSpec,
+        max_bond_dim: int | None = None,
+        tol: float = 1e-10,
+    ) -> QTTMatrix:
+        """Build QTTMatrix from a dense matrix via SVD folding.
+
+        The matrix is reshaped into a tensor with interleaved (d_out, d_in)
+        pairs per site, then decomposed left-to-right via SVD into MPO
+        site tensors.
+        """
+        L = num_sites(grid_in)
+        dims_in = [local_dim(grid_in, i) for i in range(L)]
+        dims_out = [local_dim(grid_out, i) for i in range(L)]
+
+        # Reshape matrix to tensor: first all out-dims, then all in-dims
+        # M.reshape(d_out_0, ..., d_out_{L-1}, d_in_0, ..., d_in_{L-1})
+        # Then transpose to interleave: (d_out_0, d_in_0, d_out_1, d_in_1, ...)
+        tensor = matrix.reshape(dims_out + dims_in)
+        perm = []
+        for i in range(L):
+            perm.append(i)      # out index i
+            perm.append(L + i)  # in index i
+        tensor = tensor.transpose(perm)
+
+        # SVD sweep to build MPO site tensors
+        site_tensors = []
+        remainder = tensor
+        chi_left = 1
+
+        for i in range(L - 1):
+            do, di = dims_out[i], dims_in[i]
+            # Reshape: (chi_left * do * di, remaining...)
+            remaining_size = 1
+            for j in range(i + 1, L):
+                remaining_size *= dims_out[j] * dims_in[j]
+            mat = remainder.reshape(chi_left * do * di, remaining_size)
+
+            left_idx = _trivial_index(mat.shape[0], FlowDirection.IN, "left")
+            right_idx = _trivial_index(mat.shape[1], FlowDirection.OUT, "right")
+            mat_t = DenseTensor(mat, (left_idx, right_idx))
+            U_t, s, Vh_t, _ = svd(
+                mat_t,
+                ["left"],
+                ["right"],
+                max_singular_values=max_bond_dim,
+                max_truncation_err=tol,
+            )
+            chi_new = len(s)
+            u_data = U_t.todense() if hasattr(U_t, "todense") else U_t.data
+            site_data = u_data.reshape(chi_left, do, di, chi_new)
+            site_tensors.append(site_data)
+
+            vh_data = Vh_t.todense() if hasattr(Vh_t, "todense") else Vh_t.data
+            remaining_shape = [chi_new]
+            for j in range(i + 1, L):
+                remaining_shape.extend([dims_out[j], dims_in[j]])
+            remainder = (jnp.diag(s) @ vh_data).reshape(remaining_shape)
+            chi_left = chi_new
+
+        # Last site
+        do, di = dims_out[-1], dims_in[-1]
+        site_data = remainder.reshape(chi_left, do, di, 1)
+        site_tensors.append(site_data)
+
+        return cls(site_tensors=site_tensors, grid_in=grid_in, grid_out=grid_out)
+
     # -- Application (MPO x MPS) --
 
     def apply(
