@@ -35,9 +35,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
-          uv pip install -e ./tenax
-          uv pip install -e ".[dev]" --no-deps
-          uv pip install pytest pytest-cov ruff mypy scipy
+          uv pip install -e ./tenax -e ".[dev]" pytest pytest-cov ruff mypy scipy
 
       - name: Run linter
         run: |
@@ -83,9 +81,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
-          uv pip install -e ./tenax
-          uv pip install -e ".[dev]" --no-deps
-          uv pip install pytest pytest-cov ruff mypy scipy
+          uv pip install -e ./tenax -e ".[dev]" pytest pytest-cov ruff mypy scipy
 
       - name: Run all tests
         env:
@@ -121,9 +117,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
-          uv pip install -e ./tenax
-          uv pip install -e ".[dev]" --no-deps
-          uv pip install pytest pytest-cov ruff mypy scipy
+          uv pip install -e ./tenax -e ".[dev]" pytest pytest-cov ruff mypy scipy
 
       - name: Run core tests
         env:
@@ -159,9 +153,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
-          uv pip install -e ./tenax
-          uv pip install -e ".[dev]" --no-deps
-          uv pip install pytest pytest-cov ruff mypy scipy
+          uv pip install -e ./tenax -e ".[dev]" pytest pytest-cov ruff mypy scipy
 
       - name: Run all tests
         env:
