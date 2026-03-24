@@ -180,7 +180,7 @@ class QTT:
     def sum(self, variables: list[int] | None = None) -> QTT | complex:
         """Sum over specified variables (or all) without grid spacing."""
         if variables is not None:
-            raise NotImplementedError("Partial summation not yet implemented")
+            return self._partial_contract(variables, weighted=False)
         # Full sum: contract each site with all-ones vector
         result = jnp.array([[1.0]])
         for t in self.tensors:
@@ -195,13 +195,102 @@ class QTT:
     def integrate(self, variables: list[int] | None = None) -> QTT | complex:
         """Integrate over specified variables using trapezoidal quadrature."""
         if variables is not None:
-            raise NotImplementedError("Partial integration not yet implemented")
+            return self._partial_contract(variables, weighted=True)
         # Full integration: sum * product of dx for each variable
         total_dx = 1.0
         for v in self.grid.variables:
             total_dx *= v.dx
         s = self.sum()
         return s * total_dx
+
+    def _partial_contract(self, variables: list[int], weighted: bool) -> QTT:
+        """Contract out specified variable indices.
+
+        For grouped layout, variables map to contiguous site ranges.
+        Contract those sites with weight vectors (ones for sum, dx*ones
+        for integrate), absorb pending bond matrices into surviving
+        tensors, and build a new QTT with a reduced GridSpec.
+        """
+        if self.grid.layout != "grouped":
+            raise NotImplementedError(
+                "Partial contraction only supports grouped layout"
+            )
+
+        # Map variable indices to site ranges
+        var_sites: dict[int, range] = {}
+        offset = 0
+        for vi, v in enumerate(self.grid.variables):
+            var_sites[vi] = range(offset, offset + v.n_bits)
+            offset += v.n_bits
+
+        sites_to_contract = set()
+        for vi in variables:
+            sites_to_contract.update(var_sites[vi])
+
+        # Contract specified sites, keep others
+        L = len(self.tensors)
+        new_tensors = []
+        pending_matrix = None  # accumulated bond matrix from contracted sites
+
+        for i in range(L):
+            data = (
+                self.tensors[i].todense()
+                if hasattr(self.tensors[i], "todense")
+                else self.tensors[i].data
+            )
+
+            if i in sites_to_contract:
+                d = data.shape[1]
+                v_idx = None
+                for vi, sr in var_sites.items():
+                    if i in sr:
+                        v_idx = vi
+                        break
+                # Apply dx weight only on the first site of each variable
+                if weighted and i == var_sites[v_idx].start:
+                    weight = jnp.ones(d) * self.grid.variables[v_idx].dx
+                else:
+                    weight = jnp.ones(d)
+                contracted = jnp.einsum("ijk,j->ik", data, weight)
+                if pending_matrix is None:
+                    pending_matrix = contracted
+                else:
+                    pending_matrix = pending_matrix @ contracted
+            else:
+                if pending_matrix is not None:
+                    # Absorb pending matrix into this site tensor
+                    data = jnp.einsum("pk,kjl->pjl", pending_matrix, data)
+                    pending_matrix = None
+                new_tensors.append(data)
+
+        if pending_matrix is not None and new_tensors:
+            # Absorb trailing contracted sites into last kept tensor
+            last = new_tensors[-1]
+            new_tensors[-1] = jnp.einsum("ijk,kl->ijl", last, pending_matrix)
+
+        # Build new grid with remaining variables
+        remaining_vars = tuple(
+            self.grid.variables[vi]
+            for vi in range(len(self.grid.variables))
+            if vi not in variables
+        )
+        new_grid = GridSpec(variables=remaining_vars, layout=self.grid.layout)
+
+        # Relabel tensors for new site numbering
+        mps_tensors = []
+        for i, data in enumerate(new_tensors):
+            chi_l, d, chi_r = data.shape
+            left_label = f"v_{i - 1}_{i}" if i == 0 else f"v{i - 1}_{i}"
+            right_label = f"v{i}_{i + 1}"
+            indices = (
+                _trivial_index(chi_l, FlowDirection.IN, left_label),
+                _trivial_index(d, FlowDirection.IN, f"p{i}"),
+                _trivial_index(chi_r, FlowDirection.OUT, right_label),
+            )
+            mps_tensors.append(DenseTensor(data, indices))
+
+        mps = FiniteMPS.from_tensors(mps_tensors)
+        return QTT(mps=mps, grid=new_grid)
 
     # -- Arithmetic dunders --
 

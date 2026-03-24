@@ -115,3 +115,29 @@ def test_qtt_norm_l2():
     qtt = QTT.ones(grid)
     # L2 norm of f(x)=1 on [0,1) = sqrt(1) = 1
     assert abs(qtt.norm_l2() - 1.0) < 1e-10
+
+
+def test_partial_sum_2d():
+    """Sum over one variable of a 2D function."""
+    v1 = UniformGrid(0, 1, 3)
+    v2 = UniformGrid(0, 1, 3)
+    grid = GridSpec(variables=(v1, v2), layout="grouped")
+    # f(x, y) = 1, sum over y -> f(x) = 8 (2^3 points in y)
+    qtt = QTT.ones(grid)
+    result = qtt.sum(variables=[1])
+    assert isinstance(result, QTT)
+    assert result.grid == GridSpec(variables=(v1,), layout="grouped")
+    # All values should be 8
+    assert abs(result.evaluate((0.5,)) - 8.0) < 1e-10
+
+
+def test_partial_integrate_2d():
+    """Integrate over one variable."""
+    v1 = UniformGrid(0, 1, 3)
+    v2 = UniformGrid(0, 1, 3)
+    grid = GridSpec(variables=(v1, v2), layout="grouped")
+    qtt = QTT.ones(grid)
+    # Integrate y out: integral f(x,y)dy on [0,1) = 1.0 for each x
+    result = qtt.integrate(variables=[1])
+    assert isinstance(result, QTT)
+    assert abs(result.evaluate((0.5,)) - 1.0) < 1e-10
