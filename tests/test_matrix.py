@@ -334,3 +334,56 @@ class TestDunderMethods:
         qtt = QTT.ones(grid)
         result = zero.apply(qtt, method="naive")
         assert jnp.allclose(result.to_dense(), 0.0, atol=1e-10)
+
+
+# ---------------------------------------------------------------------------
+# 11b: from_dense, from_cross
+# ---------------------------------------------------------------------------
+
+
+class TestFromDense:
+    def test_from_dense_identity(self):
+        grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+        mat = jnp.eye(8)
+        M = QTTMatrix.from_dense(mat, grid, grid)
+        qtt = QTT.ones(grid)
+        result = M.apply(qtt, method="naive")
+        assert jnp.allclose(result.to_dense(), 1.0, atol=1e-10)
+
+    def test_from_dense_tridiag(self):
+        grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+        N = 8
+        mat = jnp.zeros((N, N))
+        for i in range(N):
+            mat = mat.at[i, i].set(2.0)
+            if i > 0:
+                mat = mat.at[i, i - 1].set(-1.0)
+            if i < N - 1:
+                mat = mat.at[i, i + 1].set(-1.0)
+        M = QTTMatrix.from_dense(mat, grid, grid)
+        assert jnp.allclose(M.to_dense(), mat, atol=1e-10)
+
+
+class TestFromCross:
+    def test_from_cross_identity(self):
+        grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+
+        def f(x_out, x_in):
+            return 1.0 if abs(x_out[0] - x_in[0]) < 1e-10 else 0.0
+
+        M = QTTMatrix.from_cross(f, grid, grid, tol=1e-6)
+        qtt = QTT.ones(grid)
+        result = M.apply(qtt, method="naive")
+        assert jnp.allclose(result.to_dense(), 1.0, atol=0.5)
+
+    def test_from_cross_scaling(self):
+        """f(x_out, x_in) = 2 * delta should produce 2*I."""
+        grid = GridSpec(variables=(UniformGrid(0, 1, 3),), layout="grouped")
+
+        def f(x_out, x_in):
+            return 2.0 if abs(x_out[0] - x_in[0]) < 1e-10 else 0.0
+
+        M = QTTMatrix.from_cross(f, grid, grid, tol=1e-6)
+        qtt = QTT.ones(grid)
+        result = M.apply(qtt, method="naive")
+        assert jnp.allclose(result.to_dense(), 2.0, atol=0.5)

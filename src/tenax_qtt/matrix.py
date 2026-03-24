@@ -16,6 +16,29 @@ from tenax_qtt.qtt import QTT
 _sym = U1Symmetry()
 
 
+def _flat_to_sites(flat_idx: int, grid: GridSpec) -> tuple[int, ...]:
+    """Convert a flat row/column index to MPS site indices for multi-variable grids."""
+    from tenax_qtt.grid import _int_to_bits, grid_to_sites, _coord_to_index
+
+    # Decompose flat index into per-variable indices
+    var_indices = []
+    remaining = flat_idx
+    for v in reversed(grid.variables):
+        var_indices.append(remaining % v.n_points)
+        remaining //= v.n_points
+    var_indices.reverse()
+
+    # Convert per-variable indices to bits and then to site indices
+    # via the grid's coordinate system
+    from tenax_qtt.grid import _index_to_coord
+
+    coords = tuple(
+        _index_to_coord(grid.variables[i], var_indices[i])
+        for i in range(len(grid.variables))
+    )
+    return grid_to_sites(grid, coords)
+
+
 def _trivial_index(dim: int, flow: FlowDirection, label: str) -> TensorIndex:
     return TensorIndex(_sym, np.zeros(dim, dtype=np.int32), flow, label=label)
 
@@ -473,6 +496,98 @@ class QTTMatrix:
     def __rmul__(self, scalar: complex) -> QTTMatrix:
         """Scalar multiplication (left): ``c * M``."""
         return self.__mul__(scalar)
+
+    # -- Public constructors (from_dense, from_cross) --
+
+    @classmethod
+    def from_dense(
+        cls,
+        matrix: jnp.ndarray,
+        grid_in: GridSpec,
+        grid_out: GridSpec,
+        max_bond_dim: int | None = None,
+        tol: float = 1e-10,
+    ) -> QTTMatrix:
+        """Build QTTMatrix from a dense matrix via SVD folding.
+
+        Delegates to :meth:`_from_dense_matrix`.
+        """
+        return cls._from_dense_matrix(matrix, grid_in, grid_out, max_bond_dim, tol)
+
+    @classmethod
+    def from_cross(
+        cls,
+        f,
+        grid_in: GridSpec,
+        grid_out: GridSpec,
+        tol: float = 1e-8,
+        **kwargs,
+    ) -> QTTMatrix:
+        """Build QTTMatrix via function evaluation.
+
+        Parameters
+        ----------
+        f : callable
+            ``f(x_out, x_in) -> complex`` where ``x_out`` and ``x_in``
+            are tuples of coordinate values.
+        grid_in, grid_out : GridSpec
+            Input and output grids.
+        tol : float
+            SVD truncation tolerance.
+        **kwargs
+            Additional keyword arguments (reserved for future TCI path).
+
+        For small operators (N_out * N_in <= 2^20) the dense matrix is
+        built by evaluating *f* at every grid-point pair and then folded.
+        For larger operators, raises ``NotImplementedError``.
+        """
+        from tenax_qtt.grid import (
+            _int_to_bits,
+            sites_to_grid,
+        )
+
+        L_in = num_sites(grid_in)
+        L_out = num_sites(grid_out)
+        if L_in != L_out:
+            raise ValueError("from_cross requires same number of sites for grid_in and grid_out")
+
+        # Compute total sizes
+        N_out = 1
+        for v in grid_out.variables:
+            N_out *= v.n_points
+        N_in = 1
+        for v in grid_in.variables:
+            N_in *= v.n_points
+
+        if N_out * N_in <= 2**20:
+            # Small enough: build dense matrix by evaluating f at all pairs
+            from tenax_qtt.grid import grid_to_sites as _g2s
+
+            rows = []
+            for i_out in range(N_out):
+                # Convert flat index to site indices for the output grid
+                out_sites = tuple(
+                    _int_to_bits(i_out, grid_out.variables[0].n_bits)
+                ) if len(grid_out.variables) == 1 else _flat_to_sites(
+                    i_out, grid_out
+                )
+                x_out = sites_to_grid(grid_out, out_sites)
+                row = []
+                for i_in in range(N_in):
+                    in_sites = tuple(
+                        _int_to_bits(i_in, grid_in.variables[0].n_bits)
+                    ) if len(grid_in.variables) == 1 else _flat_to_sites(
+                        i_in, grid_in
+                    )
+                    x_in = sites_to_grid(grid_in, in_sites)
+                    row.append(complex(f(x_out, x_in)))
+                rows.append(row)
+            mat = jnp.array(rows)
+            return cls._from_dense_matrix(mat, grid_in, grid_out, tol=tol)
+
+        raise NotImplementedError(
+            "from_cross for large operators requires direct TCI on MPO sites"
+        )
 
     # -- Dense expansion --
 
