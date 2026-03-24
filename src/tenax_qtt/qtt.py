@@ -100,6 +100,39 @@ class QTT:
         """Bond-dim-1 QTT representing f(x) = 1."""
         return cls(mps=_make_constant_mps(grid, 1.0), grid=grid)
 
+    @classmethod
+    def from_cross(
+        cls,
+        f,
+        grid: GridSpec,
+        tol: float = 1e-8,
+        max_bond_dim: int = 64,
+        batch: bool = False,
+        **kwargs,
+    ):
+        """Build a QTT via cross-interpolation (delegates to cross.py).
+
+        Returns a ``QTTResult`` containing the QTT and diagnostics.
+        """
+        from tenax_qtt.cross import cross_interpolation
+
+        return cross_interpolation(
+            f, grid, tol=tol, max_bond_dim=max_bond_dim, batch=batch, **kwargs
+        )
+
+    @classmethod
+    def from_dense(
+        cls,
+        data,
+        grid: GridSpec,
+        max_bond_dim: int | None = None,
+        tol: float = 1e-8,
+    ) -> QTT:
+        """Build a QTT from a dense array via SVD folding."""
+        from tenax_qtt.folding import fold_to_qtt
+
+        return fold_to_qtt(data, grid, max_bond_dim=max_bond_dim, tol=tol)
+
     # -- Evaluation --
 
     def evaluate(self, x: tuple[float, ...]) -> complex:
