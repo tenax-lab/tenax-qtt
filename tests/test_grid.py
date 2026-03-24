@@ -1,7 +1,18 @@
 """Tests for grid specifications and coordinate mappings."""
 
 import pytest
-from tenax_qtt.grid import UniformGrid, GridSpec, num_sites, local_dim, grid_to_sites, sites_to_grid
+import jax.numpy as jnp
+from tenax_qtt.grid import (
+    UniformGrid,
+    GridSpec,
+    num_sites,
+    local_dim,
+    grid_to_sites,
+    sites_to_grid,
+    batch_grid_to_sites,
+    batch_sites_to_grid,
+    site_permutation,
+)
 
 
 def test_uniform_grid_construction():
@@ -129,3 +140,29 @@ def test_grid_to_sites_2d_fused():
     # fused level 1: (x1_bit1=0)*2 + (x2_bit1=1) = 1
     sites = grid_to_sites(g, (0.5, 0.25))
     assert sites == (2, 1)
+
+
+def test_batch_grid_to_sites():
+    g = GridSpec(variables=(UniformGrid(0.0, 1.0, 3),), layout="grouped")
+    xs = jnp.array([[0.0], [0.5]])
+    result = batch_grid_to_sites(g, xs)
+    assert result.shape == (2, 3)
+    assert tuple(int(x) for x in result[0]) == (0, 0, 0)
+    assert tuple(int(x) for x in result[1]) == (1, 0, 0)
+
+
+def test_batch_roundtrip():
+    g = GridSpec(variables=(UniformGrid(0.0, 1.0, 4),), layout="grouped")
+    xs = jnp.array([[0.0], [0.25], [0.5], [0.75]])
+    sites = batch_grid_to_sites(g, xs)
+    xs_back = batch_sites_to_grid(g, sites)
+    assert jnp.allclose(xs, xs_back, atol=1e-10)
+
+
+def test_site_permutation_grouped_to_interleaved():
+    v1 = UniformGrid(0, 1, 2)
+    v2 = UniformGrid(0, 1, 2)
+    g = GridSpec(variables=(v1, v2), layout="grouped")
+    perm = site_permutation(g, "interleaved")
+    # grouped: [x1_b0, x1_b1, x2_b0, x2_b1] -> interleaved: [x1_b0, x2_b0, x1_b1, x2_b1]
+    assert perm == (0, 2, 1, 3)

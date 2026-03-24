@@ -199,3 +199,60 @@ def sites_to_grid(grid: GridSpec, sites: tuple[int, ...]) -> tuple[float, ...]:
         return tuple(coords)
 
     raise ValueError(f"Unknown layout: {grid.layout}")
+
+
+def batch_grid_to_sites(grid: GridSpec, xs: jax.Array) -> jax.Array:
+    """Batch coordinate-to-site mapping. xs: (n_points, d) -> (n_points, n_sites)."""
+    results = []
+    for i in range(xs.shape[0]):
+        x_tuple = tuple(float(xs[i, j]) for j in range(xs.shape[1]))
+        sites = grid_to_sites(grid, x_tuple)
+        results.append(sites)
+    return jnp.array(results, dtype=jnp.int32)
+
+
+def batch_sites_to_grid(grid: GridSpec, sites: jax.Array) -> jax.Array:
+    """Batch site-to-coordinate mapping. sites: (n_points, n_sites) -> (n_points, d)."""
+    results = []
+    for i in range(sites.shape[0]):
+        s_tuple = tuple(int(sites[i, j]) for j in range(sites.shape[1]))
+        coords = sites_to_grid(grid, s_tuple)
+        results.append(coords)
+    return jnp.array(results)
+
+
+def site_permutation(source: GridSpec, target_layout: str) -> tuple[int, ...]:
+    """Permutation mapping sites from source layout to target layout.
+
+    Returns a tuple p such that target_sites[i] = source_sites[p[i]].
+    """
+    d = len(source.variables)
+
+    def _site_to_var_bit(layout: str, site: int) -> tuple[int, int]:
+        """Map site index to (variable_index, bit_level)."""
+        if layout == "grouped":
+            offset = 0
+            for var_idx, v in enumerate(source.variables):
+                if site < offset + v.n_bits:
+                    return (var_idx, site - offset)
+                offset += v.n_bits
+            raise IndexError(f"Site {site} out of range")
+        elif layout == "interleaved":
+            n = source.variables[0].n_bits
+            level = site // d
+            var_idx = site % d
+            return (var_idx, level)
+        raise ValueError(f"Unsupported layout: {layout}")
+
+    n = num_sites(source)
+    # Build inverse map: for each target site, find which source site has same (var, bit)
+    source_map: dict[tuple[int, int], int] = {}
+    for s in range(n):
+        vb = _site_to_var_bit(source.layout, s)
+        source_map[vb] = s
+
+    perm = []
+    for t in range(n):
+        vb = _site_to_var_bit(target_layout, t)
+        perm.append(source_map[vb])
+    return tuple(perm)
