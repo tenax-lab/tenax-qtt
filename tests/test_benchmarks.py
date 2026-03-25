@@ -14,8 +14,8 @@ import numpy as np
 import pytest
 from scipy.special import erf
 
-from tenax_qtt.arithmetic import hadamard
-from tenax_qtt.cross import cross_interpolation
+from tenax_qtt.arithmetic import add, hadamard, recompress
+from tenax_qtt.cross import cross_interpolation, estimate_error
 from tenax_qtt.folding import fold_to_qtt
 from tenax_qtt.fourier import fourier_mpo
 from tenax_qtt.grid import GridSpec, UniformGrid, _index_to_coord
@@ -336,3 +336,466 @@ class TestMultiDimensional:
         assert abs(result - expected) < 5e-3, (
             f"integral of x*y = {result}, expected {expected}"
         )
+
+
+# ===========================================================================
+# 7. Runge Function (Fernandez et al. 2024)
+# ===========================================================================
+
+
+@pytest.mark.algorithm
+class TestRungeFunction:
+    """Verify QTT/TCI approximation of the Runge function 1/(1+25x^2)."""
+
+    def test_runge_tci(self):
+        """1/(1+25x^2) on [-1,1] -- TCI should approximate well despite narrow peak."""
+        grid = _make_1d_grid(-1, 1, n_bits=10)
+        result = cross_interpolation(
+            lambda x: 1.0 / (1.0 + 25.0 * x[0] ** 2),
+            grid,
+            tol=1e-6,
+            max_bond_dim=20,
+            method="tci2",
+        )
+        # Evaluate at x=0: should give 1.0
+        val_0 = result.qtt.evaluate((0.0,))
+        assert abs(val_0 - 1.0) < 0.05, f"Runge(0) = {val_0}, expected 1.0"
+
+        # Evaluate at x=1: should give 1/26
+        val_1 = result.qtt.evaluate((1.0,))
+        expected_1 = 1.0 / 26.0
+        assert abs(val_1 - expected_1) < 0.05, (
+            f"Runge(1) = {val_1}, expected {expected_1}"
+        )
+
+        # Overall error should be modest
+        err = estimate_error(
+            result.qtt,
+            lambda x: 1.0 / (1.0 + 25.0 * x[0] ** 2),
+            n_samples=500,
+        )
+        assert err < 0.1, f"Runge TCI error {err:.4e} exceeds threshold"
+
+    def test_runge_folding_vs_tci(self):
+        """Folded and TCI versions should agree on the Runge function."""
+        grid = _make_1d_grid(-1, 1, n_bits=8)
+
+        def runge(x):
+            return 1.0 / (1.0 + 25.0 * x**2)
+
+        # Folded (exact SVD)
+        data = _sample_on_grid(runge, grid)
+        qtt_fold = fold_to_qtt(data, grid, tol=1e-12)
+
+        # TCI
+        result = cross_interpolation(
+            lambda x: runge(x[0]),
+            grid,
+            tol=1e-6,
+            max_bond_dim=20,
+            method="tci2",
+        )
+
+        dense_fold = qtt_fold.to_dense()
+        dense_tci = result.qtt.to_dense()
+        # Both should approximate the same function
+        assert jnp.allclose(dense_fold, dense_tci, atol=0.05)
+
+
+# ===========================================================================
+# 8. High-Dimensional (Fernandez et al. 2024)
+# ===========================================================================
+
+
+@pytest.mark.algorithm
+class TestHighDimensional:
+    """Verify QTT integration and TCI for multi-dimensional functions."""
+
+    def test_4d_gaussian_integral(self):
+        """integral exp(-sum(xi^2)) over [-3,3]^4 ~ (sqrt(pi)*erf(3))^4."""
+        n_bits = 4  # 2^4 = 16 points per variable, 2^16 total
+        variables = tuple(UniformGrid(-3, 3, n_bits) for _ in range(4))
+        grid = GridSpec(variables=variables, layout="grouped")
+
+        result = cross_interpolation(
+            lambda x: float(np.exp(-(x[0] ** 2 + x[1] ** 2 + x[2] ** 2 + x[3] ** 2))),
+            grid,
+            tol=1e-6,
+            max_bond_dim=16,
+            method="tci2",
+        )
+        integral = result.qtt.integrate()
+        expected = (math.sqrt(math.pi) * float(erf(3))) ** 4
+        # Coarse grid (only 16 pts per dim) gives larger quadrature error
+        rel_err = abs(integral - expected) / expected
+        assert rel_err < 0.15, (
+            f"4D Gaussian integral = {integral:.4f}, expected {expected:.4f}, "
+            f"rel_err = {rel_err:.4e}"
+        )
+
+    def test_separable_4d_product(self):
+        """f(x1,x2,x3,x4) = x1*x2*x3*x4, integral over [0,1]^4 = (1/2)^4 = 1/16."""
+        n_bits = 4  # 16 points per variable
+        variables = tuple(UniformGrid(0, 1, n_bits) for _ in range(4))
+        grid = GridSpec(variables=variables, layout="grouped")
+
+        # Build via folding -- 2^16 = 65536, manageable
+        N_per = 1 << n_bits
+        # Build the flat array for the 4D product function
+        coords = []
+        for v in grid.variables:
+            coords.append(jnp.array([_index_to_coord(v, i) for i in range(N_per)]))
+        # Outer product: x1 * x2 * x3 * x4
+        data = jnp.einsum("i,j,k,l->ijkl", *coords).ravel()
+        qtt = fold_to_qtt(data, grid, tol=1e-12)
+
+        integral = qtt.integrate()
+        expected = 1.0 / 16.0
+        # 4D Riemann sum with 16 points per dim: quadrature error ~O(dx) per dim
+        # compounds multiplicatively, so allow ~25% relative error
+        rel_err = abs(integral - expected) / expected
+        assert rel_err < 0.25, (
+            f"4D product integral = {integral}, expected {expected}, "
+            f"rel_err = {rel_err:.4e}"
+        )
+
+
+# ===========================================================================
+# 9. Discontinuous Functions
+# ===========================================================================
+
+
+@pytest.mark.algorithm
+class TestDiscontinuous:
+    """Verify QTT behaviour on discontinuous and non-smooth functions."""
+
+    def test_step_function(self):
+        """Step function theta(x-0.5): QTT rank should be O(log N), not O(N)."""
+        n_bits = 10  # N = 1024
+        grid = _make_1d_grid(0, 1, n_bits=n_bits)
+        N = grid.variables[0].n_points
+
+        def step(x):
+            return 1.0 if x >= 0.5 else 0.0
+
+        data = _sample_on_grid(step, grid)
+        qtt = fold_to_qtt(data, grid, tol=1e-12)
+
+        # Bond dimension should be much less than N
+        max_chi = max(qtt.bond_dims)
+        assert max_chi < N // 4, (
+            f"Step function max bond dim {max_chi} is too large (N={N})"
+        )
+
+        # Check accuracy: should be exact since step on a dyadic grid
+        # maps to a finite-rank QTT
+        dense = qtt.to_dense()
+        assert jnp.allclose(dense, data, atol=1e-10)
+
+    def test_absolute_value(self):
+        """QTT of |x-0.5| on [0,1] should have moderate rank."""
+        n_bits = 10
+        grid = _make_1d_grid(0, 1, n_bits=n_bits)
+        N = grid.variables[0].n_points
+
+        data = _sample_on_grid(lambda x: abs(x - 0.5), grid)
+        qtt = fold_to_qtt(data, grid, tol=1e-10)
+
+        # Bond dim should be moderate (much less than N)
+        max_chi = max(qtt.bond_dims)
+        assert max_chi < N // 4, f"|x-0.5| max bond dim {max_chi} too large (N={N})"
+
+        # Check accuracy
+        dense = qtt.to_dense()
+        rel_err = float(jnp.max(jnp.abs(dense - data)) / jnp.max(jnp.abs(data)))
+        assert rel_err < 1e-6, f"|x-0.5| relative error {rel_err:.4e}"
+
+
+# ===========================================================================
+# 10. Hilbert Matrix (Oseledets 2011)
+# ===========================================================================
+
+
+@pytest.mark.algorithm
+class TestHilbertMatrix:
+    """Verify QTT representation of the Hilbert matrix."""
+
+    def test_hilbert_low_rank(self):
+        """Hilbert matrix H[i,j]=1/(i+j+1) in QTT format has low bond dimension."""
+        n_bits = 3  # 8x8 matrix
+        grid = _make_1d_grid(0, 1, n_bits=n_bits)
+        N = grid.variables[0].n_points  # 8
+
+        # Build 8x8 Hilbert matrix
+        H = jnp.zeros((N, N))
+        for i in range(N):
+            for j in range(N):
+                H = H.at[i, j].set(1.0 / (i + j + 1))
+
+        qtt_mat = QTTMatrix.from_dense(H, grid, grid, tol=1e-12)
+
+        # Check max bond dimension is small
+        bond_dims = [jnp.array(t).shape[0] for t in qtt_mat.site_tensors[1:]]
+        max_chi = max(bond_dims) if bond_dims else 1
+        assert max_chi <= 8, f"Hilbert matrix max bond dim {max_chi} > 8"
+
+        # Round-trip: dense -> QTTMatrix -> dense should be accurate
+        H_reconstructed = qtt_mat.to_dense()
+        assert jnp.allclose(H, H_reconstructed, atol=1e-8), (
+            "Hilbert matrix round-trip failed"
+        )
+
+    def test_hilbert_apply(self):
+        """H @ ones should give [sum_j 1/(i+j+1)] for each row i."""
+        n_bits = 3  # 8x8
+        grid = _make_1d_grid(0, 1, n_bits=n_bits)
+        N = grid.variables[0].n_points
+
+        H = jnp.zeros((N, N))
+        for i in range(N):
+            for j in range(N):
+                H = H.at[i, j].set(1.0 / (i + j + 1))
+
+        qtt_mat = QTTMatrix.from_dense(H, grid, grid, tol=1e-12)
+
+        # Build ones vector as QTT
+        ones = QTT.ones(grid)
+
+        # Apply H @ ones
+        result = qtt_mat.apply(ones, method="naive", tol=1e-10, max_bond_dim=32)
+        result_dense = result.to_dense()
+
+        # Expected: sum_j 1/(i+j+1) for i=0..7
+        expected = jnp.array(
+            [sum(1.0 / (i + j + 1) for j in range(N)) for i in range(N)]
+        )
+        assert jnp.allclose(result_dense, expected, atol=1e-4), (
+            f"H @ ones mismatch: max err = "
+            f"{float(jnp.max(jnp.abs(result_dense - expected))):.4e}"
+        )
+
+
+# ===========================================================================
+# 11. Convolution via DFT
+# ===========================================================================
+
+
+@pytest.mark.algorithm
+class TestConvolution:
+    """Verify circular convolution via DFT in QTT format."""
+
+    def test_convolution_via_dft(self):
+        """F_inv(F(f) * F(g)) should approximate circular convolution.
+
+        Using the shift property: convolving with a delta at index 0
+        should return the original signal.
+        """
+        n_bits = 6  # 64 points
+        grid = _make_1d_grid(0, 1, n_bits=n_bits)
+        N = grid.variables[0].n_points
+
+        # f = delta at index 0
+        f_data = jnp.zeros(N)
+        f_data = f_data.at[0].set(1.0)
+        qtt_f = fold_to_qtt(f_data, grid, tol=1e-14)
+
+        # g = sin(2*pi*x)
+        g_data = _sample_on_grid(lambda x: math.sin(2 * math.pi * x), grid)
+        qtt_g = fold_to_qtt(g_data, grid, tol=1e-12)
+
+        # Forward DFT
+        F = fourier_mpo(grid, max_bond_dim=64, tol=1e-12)
+        F_inv = fourier_mpo(grid, inverse=True, max_bond_dim=64, tol=1e-12)
+
+        F_f = F.apply(qtt_f, method="naive", tol=1e-10, max_bond_dim=64)
+        F_g = F.apply(qtt_g, method="naive", tol=1e-10, max_bond_dim=64)
+
+        # Hadamard product in Fourier domain (pointwise multiply)
+        # For circular convolution: scale by sqrt(N) due to unitary convention
+        F_fg = hadamard(F_f, F_g, tol=1e-10, max_bond_dim=64)
+
+        # Inverse DFT, then scale by sqrt(N) for convolution theorem with
+        # unitary DFT: conv(f,g) = sqrt(N) * F_inv(F(f) .* F(g))
+        conv_result = F_inv.apply(F_fg, method="naive", tol=1e-10, max_bond_dim=64)
+        conv_dense = conv_result.to_dense() * math.sqrt(N)
+
+        # Delta at 0 convolving with g should give g (circular)
+        assert jnp.allclose(jnp.real(conv_dense), g_data, atol=0.05), (
+            f"Convolution with delta failed: max err = "
+            f"{float(jnp.max(jnp.abs(jnp.real(conv_dense) - g_data))):.4e}"
+        )
+
+
+# ===========================================================================
+# 12. Exponential Convergence
+# ===========================================================================
+
+
+@pytest.mark.algorithm
+class TestExponentialConvergence:
+    """Verify that QTT error decreases as bond dimension increases."""
+
+    def test_bond_dim_vs_error(self):
+        """Error should decrease as bond dimension increases for smooth functions."""
+        n_bits = 8  # 256 points
+        grid = _make_1d_grid(0, 1, n_bits=n_bits)
+        data = _sample_on_grid(lambda x: math.sin(2 * math.pi * x), grid)
+
+        errors = []
+        bond_dims = [1, 2, 4, 8]
+        for chi in bond_dims:
+            qtt = fold_to_qtt(data, grid, max_bond_dim=chi, tol=1e-15)
+            dense = qtt.to_dense()
+            err = float(jnp.max(jnp.abs(dense - data)))
+            errors.append(err)
+
+        # Errors should be monotonically non-increasing
+        for i in range(len(errors) - 1):
+            assert errors[i + 1] <= errors[i] + 1e-14, (
+                f"Error not decreasing: chi={bond_dims[i]} err={errors[i]:.4e}, "
+                f"chi={bond_dims[i + 1]} err={errors[i + 1]:.4e}"
+            )
+
+        # Error at max bond dim 8 should be much smaller than at bond dim 1
+        # sin(2*pi*x) has exact rank 2, so bond dim >= 2 should be exact
+        assert errors[-1] < 1e-8, (
+            f"Error at chi=8 is {errors[-1]:.4e}, expected near machine precision"
+        )
+        assert errors[0] > errors[-1], "Error at chi=1 should be larger than at chi=8"
+
+
+# ===========================================================================
+# 13. Layout Comparison
+# ===========================================================================
+
+
+@pytest.mark.algorithm
+class TestLayoutComparison:
+    """Verify that different grid layouts produce consistent function values."""
+
+    def test_interleaved_vs_grouped_2d(self):
+        """Same 2D function should give similar values with different layouts."""
+        n_bits = 4  # 16 points per variable
+
+        gx = UniformGrid(0, 2 * math.pi, n_bits)
+        gy = UniformGrid(0, 2 * math.pi, n_bits)
+        grid_grouped = GridSpec(variables=(gx, gy), layout="grouped")
+        grid_interleaved = GridSpec(variables=(gx, gy), layout="interleaved")
+
+        N = gx.n_points
+
+        def f_2d(x, y):
+            return math.sin(x) * math.cos(y)
+
+        # Build grouped QTT
+        xs = jnp.array([_index_to_coord(gx, i) for i in range(N)])
+        ys = jnp.array([_index_to_coord(gy, j) for j in range(N)])
+        data_grouped = jnp.array(
+            [[f_2d(float(xs[i]), float(ys[j])) for j in range(N)] for i in range(N)]
+        ).ravel()
+        qtt_grouped = fold_to_qtt(data_grouped, grid_grouped, tol=1e-12)
+
+        # Build interleaved QTT
+        # For interleaved layout, the flat array must be ordered by the
+        # interleaved bit pattern
+        from tenax_qtt.grid import sites_to_grid
+
+        L_interleaved = n_bits * 2  # total sites
+        total_points = N * N
+        data_interleaved = jnp.zeros(total_points)
+        for flat_idx in range(total_points):
+            # Decompose flat_idx into site indices (binary digits)
+            bits = []
+            remaining = flat_idx
+            for _ in range(L_interleaved):
+                bits.append(remaining % 2)
+                remaining //= 2
+            bits.reverse()
+            sites = tuple(bits)
+            coords = sites_to_grid(grid_interleaved, sites)
+            val = f_2d(coords[0], coords[1])
+            data_interleaved = data_interleaved.at[flat_idx].set(val)
+        qtt_interleaved = fold_to_qtt(data_interleaved, grid_interleaved, tol=1e-12)
+
+        # Evaluate at actual grid points to avoid snapping artifacts.
+        # Both QTTs should agree at grid-aligned coordinates.
+        test_indices = [(1, 2), (5, 10), (7, 3), (14, 0)]
+        for ix, iy in test_indices:
+            x_val = float(_index_to_coord(gx, ix))
+            y_val = float(_index_to_coord(gy, iy))
+            val_g = qtt_grouped.evaluate((x_val, y_val))
+            val_i = qtt_interleaved.evaluate((x_val, y_val))
+            expected = f_2d(x_val, y_val)
+            # Both should match the true value at grid points
+            assert abs(val_g - expected) < 1e-6, (
+                f"Grouped evaluate({x_val:.3f}, {y_val:.3f}) = {val_g}, "
+                f"expected {expected}"
+            )
+            assert abs(val_i - expected) < 1e-6, (
+                f"Interleaved evaluate({x_val:.3f}, {y_val:.3f}) = {val_i}, "
+                f"expected {expected}"
+            )
+
+
+# ===========================================================================
+# 14. Recompression Quality
+# ===========================================================================
+
+
+@pytest.mark.algorithm
+class TestRecompressionQuality:
+    """Verify that recompression preserves accuracy."""
+
+    def test_recompress_preserves_accuracy(self):
+        """Recompressing a QTT should not significantly degrade accuracy."""
+        grid = _make_1d_grid(0, 1, n_bits=8)
+        data = _sample_on_grid(lambda x: math.sin(2 * math.pi * x), grid)
+
+        # Build with generous tolerance (will have moderate bond dim)
+        qtt = fold_to_qtt(data, grid, tol=1e-14)
+        original_error = float(jnp.max(jnp.abs(qtt.to_dense() - data)))
+
+        # Recompress -- sin(2*pi*x) has rank 2, so recompression should be lossless
+        qtt_rc = recompress(qtt, tol=1e-10, max_bond_dim=4)
+        rc_error = float(jnp.max(jnp.abs(qtt_rc.to_dense() - data)))
+
+        # After recompression, error should still be small
+        assert rc_error < 1e-6, (
+            f"Recompression error {rc_error:.4e} too large "
+            f"(original {original_error:.4e})"
+        )
+
+    def test_add_then_recompress(self):
+        """Adding two QTTs inflates bond dim; recompressing should recover."""
+        grid = _make_1d_grid(0, 1, n_bits=8)
+        data_sin = _sample_on_grid(lambda x: math.sin(2 * math.pi * x), grid)
+        data_cos = _sample_on_grid(lambda x: math.cos(2 * math.pi * x), grid)
+
+        qtt_sin = fold_to_qtt(data_sin, grid, tol=1e-14)
+        qtt_cos = fold_to_qtt(data_cos, grid, tol=1e-14)
+
+        # Add without recompression
+        qtt_sum = add(qtt_sin, qtt_cos, tol=0)
+        max_chi_inflated = max(qtt_sum.bond_dims)
+
+        # Recompress
+        qtt_rc = recompress(qtt_sum, tol=1e-10, max_bond_dim=16)
+        max_chi_compressed = max(qtt_rc.bond_dims)
+
+        # Compressed bond dim should be smaller than inflated
+        assert max_chi_compressed < max_chi_inflated, (
+            f"Recompression did not reduce bond dim: "
+            f"{max_chi_compressed} >= {max_chi_inflated}"
+        )
+
+        # sin(2*pi*x) + cos(2*pi*x) = sqrt(2)*sin(2*pi*x + pi/4)
+        # which has QTT rank 2, so compressed bond dim should be small
+        assert max_chi_compressed <= 4, (
+            f"Compressed bond dim {max_chi_compressed} unexpectedly large"
+        )
+
+        # Check accuracy
+        expected = data_sin + data_cos
+        result = qtt_rc.to_dense()
+        err = float(jnp.max(jnp.abs(result - expected)))
+        assert err < 1e-6, f"Add+recompress error {err:.4e}"
