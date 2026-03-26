@@ -145,6 +145,56 @@ def test_partial_integrate_2d():
     assert abs(result.evaluate((0.5,)) - 1.0) < 1e-10
 
 
+def test_partial_sum_interleaved():
+    """Sum over one variable of a 2D interleaved QTT."""
+    v1 = UniformGrid(0, 1, 3)
+    v2 = UniformGrid(0, 1, 3)
+    grid = GridSpec(variables=(v1, v2), layout="interleaved")
+    qtt = QTT.ones(grid)
+    # f(x, y) = 1, sum over y -> f(x) = 8 (2^3 points in y)
+    result = qtt.sum(variables=[1])
+    assert isinstance(result, QTT)
+    assert abs(result.evaluate((0.5,)) - 8.0) < 1e-10
+
+
+def test_partial_integrate_interleaved():
+    """Integrate over one variable of a 2D interleaved QTT."""
+    v1 = UniformGrid(0, 1, 3)
+    v2 = UniformGrid(0, 1, 3)
+    grid = GridSpec(variables=(v1, v2), layout="interleaved")
+    qtt = QTT.ones(grid)
+    # Integrate y out: integral f(x,y)dy on [0,1) = 1.0 for each x
+    result = qtt.integrate(variables=[1])
+    assert isinstance(result, QTT)
+    assert abs(result.evaluate((0.5,)) - 1.0) < 1e-10
+
+
+def test_partial_sum_interleaved_first_variable():
+    """Sum over the first variable of a 2D interleaved QTT."""
+    v1 = UniformGrid(0, 1, 3)
+    v2 = UniformGrid(0, 1, 3)
+    grid = GridSpec(variables=(v1, v2), layout="interleaved")
+    qtt = QTT.ones(grid)
+    # f(x, y) = 1, sum over x -> f(y) = 8
+    result = qtt.sum(variables=[0])
+    assert isinstance(result, QTT)
+    assert abs(result.evaluate((0.5,)) - 8.0) < 1e-10
+
+
+def test_partial_sum_interleaved_consistency():
+    """Interleaved and grouped partial sums should give same result for constant QTT."""
+    v1 = UniformGrid(0, 1, 3)
+    v2 = UniformGrid(0, 1, 3)
+    grid_grouped = GridSpec(variables=(v1, v2), layout="grouped")
+    grid_interleaved = GridSpec(variables=(v1, v2), layout="interleaved")
+    qtt_grouped = QTT.ones(grid_grouped)
+    qtt_interleaved = QTT.ones(grid_interleaved)
+    s_grouped = qtt_grouped.sum(variables=[1])
+    s_interleaved = qtt_interleaved.sum(variables=[1])
+    # Both should evaluate to 8 at any point
+    assert abs(s_grouped.evaluate((0.5,)) - s_interleaved.evaluate((0.5,))) < 1e-10
+
+
 def test_qtt_left_canonicalize():
     grid = GridSpec(variables=(UniformGrid(0, 1, 4),), layout="grouped")
     qtt = QTT.ones(grid)

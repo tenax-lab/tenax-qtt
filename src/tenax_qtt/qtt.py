@@ -234,25 +234,48 @@ class QTT:
         """Contract out specified variable indices.
 
         For grouped layout, variables map to contiguous site ranges.
-        Contract those sites with weight vectors (ones for sum, dx*ones
-        for integrate), absorb pending bond matrices into surviving
-        tensors, and build a new QTT with a reduced GridSpec.
+        For interleaved layout, variables occupy non-contiguous sites
+        ``{v, v+d, v+2d, ...}`` where *d* is the number of variables.
+
+        In both cases the algorithm walks left-to-right, contracts sites
+        belonging to eliminated variables with weight vectors (ones for
+        sum, dx*ones for integrate), accumulates pending bond matrices
+        across gaps, and absorbs them into the next surviving tensor.
         """
-        if self.grid.layout != "grouped":
+        if self.grid.layout not in ("grouped", "interleaved"):
             raise NotImplementedError(
-                "Partial contraction only supports grouped layout"
+                "Partial contraction only supports grouped and interleaved layouts"
             )
 
-        # Map variable indices to site ranges
-        var_sites: dict[int, range] = {}
-        offset = 0
-        for vi, v in enumerate(self.grid.variables):
-            var_sites[vi] = range(offset, offset + v.n_bits)
-            offset += v.n_bits
+        d_vars = len(self.grid.variables)
+        variables_set = set(variables)
 
-        sites_to_contract = set()
-        for vi in variables:
-            sites_to_contract.update(var_sites[vi])
+        # Map each site to its owning variable index
+        site_to_var: dict[int, int] = {}
+        # Track which sites belong to contracted variables
+        sites_to_contract: set[int] = set()
+        # Track the first site for each contracted variable (for dx weight)
+        first_site_of_var: dict[int, int] = {}
+
+        if self.grid.layout == "grouped":
+            offset = 0
+            for vi, v in enumerate(self.grid.variables):
+                for s in range(offset, offset + v.n_bits):
+                    site_to_var[s] = vi
+                if vi in variables_set:
+                    sites_to_contract.update(range(offset, offset + v.n_bits))
+                    first_site_of_var[vi] = offset
+                offset += v.n_bits
+        else:  # interleaved
+            n_bits = self.grid.variables[0].n_bits
+            for level in range(n_bits):
+                for var_idx in range(d_vars):
+                    site = level * d_vars + var_idx
+                    site_to_var[site] = var_idx
+                    if var_idx in variables_set:
+                        sites_to_contract.add(site)
+                        if var_idx not in first_site_of_var:
+                            first_site_of_var[var_idx] = site
 
         # Contract specified sites, keep others
         L = len(self.tensors)
@@ -268,13 +291,9 @@ class QTT:
 
             if i in sites_to_contract:
                 d = data.shape[1]
-                v_idx = None
-                for vi, sr in var_sites.items():
-                    if i in sr:
-                        v_idx = vi
-                        break
+                v_idx = site_to_var[i]
                 # Apply dx weight only on the first site of each variable
-                if weighted and i == var_sites[v_idx].start:
+                if weighted and i == first_site_of_var[v_idx]:
                     weight = jnp.ones(d) * self.grid.variables[v_idx].dx
                 else:
                     weight = jnp.ones(d)
@@ -297,10 +316,12 @@ class QTT:
 
         # Build new grid with remaining variables
         remaining_vars = tuple(
-            self.grid.variables[vi]
-            for vi in range(len(self.grid.variables))
-            if vi not in variables
+            self.grid.variables[vi] for vi in range(d_vars) if vi not in variables_set
         )
+        # After partial contraction of an interleaved layout, the
+        # remaining sites still alternate between the surviving
+        # variables, so the result layout stays interleaved (or grouped
+        # when only one variable remains -- both are equivalent then).
         new_grid = GridSpec(variables=remaining_vars, layout=self.grid.layout)
 
         # Relabel tensors for new site numbering
