@@ -7,20 +7,14 @@ from typing import TYPE_CHECKING
 
 import jax
 import jax.numpy as jnp
-import numpy as np
-from tenax import DenseTensor, FlowDirection, TensorIndex, U1Symmetry
+from tenax import DenseTensor, FlowDirection
 from tenax.core.mps import FiniteMPS
 
+from tenax_qtt._utils import trivial_index as _trivial_index
 from tenax_qtt.grid import GridSpec, local_dim, num_sites
 
 if TYPE_CHECKING:
     from tenax import Tensor
-
-
-def _trivial_index(dim: int, flow: FlowDirection, label: str) -> TensorIndex:
-    sym = U1Symmetry()
-    charges = np.zeros(dim, dtype=np.int32)
-    return TensorIndex(sym, charges, flow, label=label)
 
 
 def _make_constant_mps(grid: GridSpec, value: float) -> FiniteMPS:

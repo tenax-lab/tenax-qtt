@@ -3,17 +3,11 @@
 from __future__ import annotations
 
 import jax.numpy as jnp
-import numpy as np
-from tenax import DenseTensor, FlowDirection, TensorIndex, U1Symmetry, svd
+from tenax import DenseTensor, FlowDirection, svd
 from tenax.core.mps import FiniteMPS
 
+from tenax_qtt._utils import trivial_index as _trivial_index
 from tenax_qtt.qtt import QTT
-
-_sym = U1Symmetry()
-
-
-def _trivial_index(dim: int, flow: FlowDirection, label: str) -> TensorIndex:
-    return TensorIndex(_sym, np.zeros(dim, dtype=np.int32), flow, label=label)
 
 
 def _check_compatible(a: QTT, b: QTT) -> None:

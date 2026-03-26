@@ -8,17 +8,12 @@ from typing import Literal
 
 import jax.numpy as jnp
 import numpy as np
-from tenax import DenseTensor, FlowDirection, TensorIndex, U1Symmetry
+from tenax import DenseTensor, FlowDirection
 from tenax.core.mps import FiniteMPS
 
+from tenax_qtt._utils import trivial_index as _trivial_index
 from tenax_qtt.grid import GridSpec, local_dim, num_sites, sites_to_grid
 from tenax_qtt.qtt import QTT
-
-_sym = U1Symmetry()
-
-
-def _trivial_index(dim: int, flow: FlowDirection, label: str) -> TensorIndex:
-    return TensorIndex(_sym, np.zeros(dim, dtype=np.int32), flow, label=label)
 
 
 @dataclass(frozen=True)
