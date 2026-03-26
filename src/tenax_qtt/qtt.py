@@ -157,12 +157,34 @@ class QTT:
         return complex(result[0, 0])
 
     def evaluate_batch(self, xs: jax.Array) -> jax.Array:
-        """Vectorized evaluation at multiple points."""
-        vals = [
-            self.evaluate(tuple(float(xs[i, j]) for j in range(xs.shape[1])))
-            for i in range(xs.shape[0])
+        """Vectorized evaluation at multiple points.
+
+        Uses a batched MPS contraction: site-index selection is computed
+        for all points at once, then the MPS is contracted with a single
+        pass of batched matrix multiplies instead of one Python loop per
+        point.
+        """
+        from tenax_qtt.grid import grid_to_sites
+
+        n = xs.shape[0]
+        # Compute site indices for every input point (Python-level bit ops)
+        all_sites = [
+            grid_to_sites(self.grid, tuple(float(xs[i, j]) for j in range(xs.shape[1])))
+            for i in range(n)
         ]
-        return jnp.array(vals)
+        # Batch MPS contraction
+        result = jnp.ones((n, 1, 1))  # (n_points, 1, 1)
+        for i, t in enumerate(self.tensors):
+            data = t.todense() if hasattr(t, "todense") else t.data
+            # data shape: (chi_l, d_phys, chi_r)
+            site_indices = jnp.array([s[i] for s in all_sites])  # (n,)
+            # Gather physical slices for all points: (chi_l, n, chi_r)
+            slices = data[:, site_indices, :]
+            # Transpose to (n, chi_l, chi_r) for batched matmul
+            slices = jnp.transpose(slices, (1, 0, 2))
+            # Batched matmul: (n, 1, chi_l) @ (n, chi_l, chi_r) -> (n, 1, chi_r)
+            result = jnp.matmul(result, slices)
+        return result[:, 0, 0]
 
     # -- Dense expansion --
 

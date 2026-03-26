@@ -203,7 +203,13 @@ def sites_to_grid(grid: GridSpec, sites: tuple[int, ...]) -> tuple[float, ...]:
 
 
 def batch_grid_to_sites(grid: GridSpec, xs: jax.Array) -> jax.Array:
-    """Batch coordinate-to-site mapping. xs: (n_points, d) -> (n_points, n_sites)."""
+    """Batch coordinate-to-site mapping. xs: (n_points, d) -> (n_points, n_sites).
+
+    Note: uses a Python loop internally because grid_to_sites relies on
+    Python-level bit manipulation that is not JIT-compatible.  The
+    batched MPS contraction in ``QTT.evaluate_batch`` is where the real
+    vectorization win happens.
+    """
     results = []
     for i in range(xs.shape[0]):
         x_tuple = tuple(float(xs[i, j]) for j in range(xs.shape[1]))
@@ -213,7 +219,11 @@ def batch_grid_to_sites(grid: GridSpec, xs: jax.Array) -> jax.Array:
 
 
 def batch_sites_to_grid(grid: GridSpec, sites: jax.Array) -> jax.Array:
-    """Batch site-to-coordinate mapping. sites: (n_points, n_sites) -> (n_points, d)."""
+    """Batch site-to-coordinate mapping. sites: (n_points, n_sites) -> (n_points, d).
+
+    Note: uses a Python loop internally because sites_to_grid relies on
+    Python-level bit manipulation that is not JIT-compatible.
+    """
     results = []
     for i in range(sites.shape[0]):
         s_tuple = tuple(int(sites[i, j]) for j in range(sites.shape[1]))
