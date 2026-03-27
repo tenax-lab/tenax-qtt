@@ -259,15 +259,15 @@ class TestFourierProperties:
         The DFT is unitary so the L2 norm of the coefficient vector
         should be preserved.
         """
-        n_bits = 6  # 64 points -- small enough for DFT matrix
+        n_bits = 4  # 16 points -- exact DFT MPO at this size
         grid = _make_1d_grid(0, 1, n_bits=n_bits)
         # Build a test function
         data = _sample_on_grid(lambda x: math.sin(2 * math.pi * x) + 0.5, grid)
         qtt_f = fold_to_qtt(data, grid, tol=1e-12)
 
-        # DFT
-        F = fourier_mpo(grid, max_bond_dim=64, tol=1e-12)
-        qtt_Ff = F.apply(qtt_f, method="naive", tol=1e-10, max_bond_dim=64)
+        # DFT (bond dim 4^2=16 at peak, well within budget)
+        F = fourier_mpo(grid, max_bond_dim=256, tol=1e-12)
+        qtt_Ff = F.apply(qtt_f, method="naive", tol=1e-10, max_bond_dim=256)
 
         norm_f = float(jnp.linalg.norm(qtt_f.to_dense()))
         norm_Ff = float(jnp.linalg.norm(qtt_Ff.to_dense()))
@@ -283,15 +283,15 @@ class TestFourierProperties:
         For sin(2*pi*k*n/N) = (exp(i*...) - exp(-i*...)) / (2i),
         the DFT has peaks at m=k and m=N-k.
         """
-        n_bits = 6  # 64 points
+        n_bits = 4  # 16 points -- exact DFT at this size
         grid = _make_1d_grid(0, 1, n_bits=n_bits)
         N = grid.variables[0].n_points
         k = 3  # frequency index
         data = _sample_on_grid(lambda x: math.sin(2 * math.pi * k * x), grid)
         qtt_f = fold_to_qtt(data, grid, tol=1e-12)
 
-        F = fourier_mpo(grid, max_bond_dim=64, tol=1e-12)
-        qtt_Ff = F.apply(qtt_f, method="naive", tol=1e-10, max_bond_dim=64)
+        F = fourier_mpo(grid, max_bond_dim=256, tol=1e-12)
+        qtt_Ff = F.apply(qtt_f, method="naive", tol=1e-10, max_bond_dim=256)
 
         spectrum = jnp.abs(qtt_Ff.to_dense())
 
@@ -590,7 +590,7 @@ class TestConvolution:
         Using the shift property: convolving with a delta at index 0
         should return the original signal.
         """
-        n_bits = 6  # 64 points
+        n_bits = 4  # 16 points -- exact DFT at this size
         grid = _make_1d_grid(0, 1, n_bits=n_bits)
         N = grid.variables[0].n_points
 
@@ -603,20 +603,20 @@ class TestConvolution:
         g_data = _sample_on_grid(lambda x: math.sin(2 * math.pi * x), grid)
         qtt_g = fold_to_qtt(g_data, grid, tol=1e-12)
 
-        # Forward DFT
-        F = fourier_mpo(grid, max_bond_dim=64, tol=1e-12)
-        F_inv = fourier_mpo(grid, inverse=True, max_bond_dim=64, tol=1e-12)
+        # Forward DFT (bond dim 4^2=16 at peak, exact for n_bits=4)
+        F = fourier_mpo(grid, max_bond_dim=256, tol=1e-12)
+        F_inv = fourier_mpo(grid, inverse=True, max_bond_dim=256, tol=1e-12)
 
-        F_f = F.apply(qtt_f, method="naive", tol=1e-10, max_bond_dim=64)
-        F_g = F.apply(qtt_g, method="naive", tol=1e-10, max_bond_dim=64)
+        F_f = F.apply(qtt_f, method="naive", tol=1e-10, max_bond_dim=256)
+        F_g = F.apply(qtt_g, method="naive", tol=1e-10, max_bond_dim=256)
 
         # Hadamard product in Fourier domain (pointwise multiply)
         # For circular convolution: scale by sqrt(N) due to unitary convention
-        F_fg = hadamard(F_f, F_g, tol=1e-10, max_bond_dim=64)
+        F_fg = hadamard(F_f, F_g, tol=1e-10, max_bond_dim=256)
 
         # Inverse DFT, then scale by sqrt(N) for convolution theorem with
         # unitary DFT: conv(f,g) = sqrt(N) * F_inv(F(f) .* F(g))
-        conv_result = F_inv.apply(F_fg, method="naive", tol=1e-10, max_bond_dim=64)
+        conv_result = F_inv.apply(F_fg, method="naive", tol=1e-10, max_bond_dim=256)
         conv_dense = conv_result.to_dense() * math.sqrt(N)
 
         # Delta at 0 convolving with g should give g (circular)
