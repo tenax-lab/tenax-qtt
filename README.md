@@ -101,19 +101,6 @@ Run an example:
 uv run python examples/function_approximation.py
 ```
 
-## Citation
-
-If you use tenax-qtt in your research, please cite the prrLU paper:
-
-```bibtex
-@article{fernandez2024prrlu,
-  title={Speeding up tensor network contraction with prrLU decomposition},
-  author={Fernandez, Yuriel Nunez and others},
-  journal={arXiv preprint arXiv:2407.02454},
-  year={2024}
-}
-```
-
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) for details.
