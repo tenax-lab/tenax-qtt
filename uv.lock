@@ -651,7 +651,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
-    { name = "tenax-tn", specifier = ">=0.2.0" },
+    { name = "tenax-tn", specifier = ">=0.3.0" },
 ]
 provides-extras = ["dev"]
 
@@ -660,7 +660,7 @@ dev = [{ name = "tenax-qtt", extras = ["dev"] }]
 
 [[package]]
 name = "tenax-tn"
-version = "0.2.0"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jax" },
@@ -670,9 +670,9 @@ dependencies = [
     { name = "optax" },
     { name = "scipy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7d/28/8c23bc290426a7997ef58dbc485e4bd9a9139c0eaace45c1d6fc10eeed3f/tenax_tn-0.2.0.tar.gz", hash = "sha256:0e7183756c5301dd53273eed46acc9c7241929761ad6fb27168186336803ffbc", size = 403490, upload-time = "2026-03-16T20:18:52.806Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ad/43/7cab02e4bdbb529d9463850f405fda44ba746e179a71f85746c1d349dfec/tenax_tn-0.3.0.tar.gz", hash = "sha256:8576fd77ce83bb3e9b023da9c945581a9b4382b79325a049bd003e59f8713c9a", size = 559346, upload-time = "2026-03-27T04:18:02.494Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/22/f8/b6028afbcbe0909a7529a6d811598f229972e27dce15270aee612684df11/tenax_tn-0.2.0-py3-none-any.whl", hash = "sha256:ee660b389c751c971af05e6a903a343988ab87e0f7b16a51ae061f26c01b3e98", size = 203421, upload-time = "2026-03-16T20:18:51.379Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/40/d3a95d69ce76ba1f28fa1e65e9f217070517dcd14c9e742111d2756f501d/tenax_tn-0.3.0-py3-none-any.whl", hash = "sha256:b3d76744145bbd7d58b0d79d9c8010d26dfc7d69ab18d6a0f7d4d1ab66cdf766", size = 227376, upload-time = "2026-03-27T04:18:00.642Z" },
 ]
 
 [[package]]

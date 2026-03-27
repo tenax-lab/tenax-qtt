@@ -18,12 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Checkout tenax
-        uses: actions/checkout@v5
-        with:
-          repository: tenax-lab/tenax
-          path: tenax
-
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -33,18 +27,16 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: |
-          uv venv
-          uv pip install -e ./tenax -e ".[dev]" pytest pytest-cov "ruff==0.15.2" mypy scipy
+        run: uv sync --extra dev
 
       - name: Run linter
-        run: .venv/bin/ruff check src/ tests/ --select F,UP
+        run: uv run ruff check src/ tests/ --select F,UP
 
       - name: Run core tests
         env:
           JAX_PLATFORMS: cpu
         run: |
-          .venv/bin/pytest tests/ -m "core" \
+          uv run pytest tests/ -m "core" \
             --cov=tenax_qtt \
             --cov-report=xml \
             --cov-report=term-missing \
@@ -62,12 +54,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Checkout tenax
-        uses: actions/checkout@v5
-        with:
-          repository: tenax-lab/tenax
-          path: tenax
-
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -77,15 +63,13 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: |
-          uv venv
-          uv pip install -e ./tenax -e ".[dev]" pytest pytest-cov "ruff==0.15.2" mypy scipy
+        run: uv sync --extra dev
 
       - name: Run all tests
         env:
           JAX_PLATFORMS: cpu
         run: |
-          .venv/bin/pytest tests/ \
+          uv run pytest tests/ \
             --cov=tenax_qtt \
             --cov-report=xml \
             --cov-report=term-missing \
@@ -98,12 +82,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Checkout tenax
-        uses: actions/checkout@v5
-        with:
-          repository: tenax-lab/tenax
-          path: tenax
-
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -113,15 +91,13 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: |
-          uv venv
-          uv pip install -e ./tenax -e ".[dev]" pytest pytest-cov "ruff==0.15.2" mypy scipy
+        run: uv sync --extra dev
 
       - name: Run core tests
         env:
           JAX_PLATFORMS: cpu
         run: |
-          .venv/bin/pytest tests/ -m "core" \
+          uv run pytest tests/ -m "core" \
             --cov=tenax_qtt \
             --cov-report=term-missing \
             -v
@@ -134,12 +110,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Checkout tenax
-        uses: actions/checkout@v5
-        with:
-          repository: tenax-lab/tenax
-          path: tenax
-
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -149,15 +119,13 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: |
-          uv venv
-          uv pip install -e ./tenax -e ".[dev]" pytest pytest-cov "ruff==0.15.2" mypy scipy
+        run: uv sync --extra dev
 
       - name: Run all tests
         env:
           JAX_PLATFORMS: cpu
         run: |
-          .venv/bin/pytest tests/ \
+          uv run pytest tests/ \
             --cov=tenax_qtt \
             --cov-report=term-missing \
             -v
