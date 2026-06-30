@@ -16,7 +16,7 @@ def _make_trivial_index(dim, flow, label):
 
     sym = U1Symmetry()
     charges = np.zeros(dim, dtype=np.int32)
-    return TensorIndex(sym, charges, flow, label=label)
+    return TensorIndex.from_charges(sym, charges, flow, label=label)
 
 
 def _make_bond_dim1_mps(n_sites, local_dims, value=1.0):

@@ -10,4 +10,4 @@ _sym = U1Symmetry()
 
 def trivial_index(dim: int, flow: FlowDirection, label: str) -> TensorIndex:
     """Create a TensorIndex with trivial (all-zero) U(1) charges."""
-    return TensorIndex(_sym, np.zeros(dim, dtype=np.int32), flow, label=label)
+    return TensorIndex.from_charges(_sym, np.zeros(dim, dtype=np.int32), flow, label=label)

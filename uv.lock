@@ -651,7 +651,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
-    { name = "tenax-tn", specifier = ">=0.3.0" },
+    { name = "tenax-tn", specifier = ">=0.8.0" },
 ]
 provides-extras = ["dev"]
 
@@ -660,7 +660,7 @@ dev = [{ name = "tenax-qtt", extras = ["dev"] }]
 
 [[package]]
 name = "tenax-tn"
-version = "0.3.0"
+version = "0.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jax" },
@@ -670,9 +670,12 @@ dependencies = [
     { name = "optax" },
     { name = "scipy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ad/43/7cab02e4bdbb529d9463850f405fda44ba746e179a71f85746c1d349dfec/tenax_tn-0.3.0.tar.gz", hash = "sha256:8576fd77ce83bb3e9b023da9c945581a9b4382b79325a049bd003e59f8713c9a", size = 559346, upload-time = "2026-03-27T04:18:02.494Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f4/8e/2748e3f902155717552a6b9b36debd79441ad8be8502ed4af0a1ee5322c0/tenax_tn-0.8.0.tar.gz", hash = "sha256:9a550dbfa463a6ad275ba5c16cb923fd42334c6956a485bff0c10e56082f8a40", size = 1999359, upload-time = "2026-06-18T07:33:23.624Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c7/40/d3a95d69ce76ba1f28fa1e65e9f217070517dcd14c9e742111d2756f501d/tenax_tn-0.3.0-py3-none-any.whl", hash = "sha256:b3d76744145bbd7d58b0d79d9c8010d26dfc7d69ab18d6a0f7d4d1ab66cdf766", size = 227376, upload-time = "2026-03-27T04:18:00.642Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/4d/73324857ac3850e99af71f964bf5407a6962dd632c9338cce3f17996426d/tenax_tn-0.8.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:8776530da3f474bcfea540fc9d89f286499e87e04c2e01f1b299d1b09e3707f4", size = 810775, upload-time = "2026-06-18T07:33:17.64Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/57/df12d9e5573440d925b5e7c1aa31b6b4a047d9dc09259ceb0901435a6cb0/tenax_tn-0.8.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:0b922228e7f27b8480953f8c335b8bebad390b6077e1fd956a190df7fef79d43", size = 2078710, upload-time = "2026-06-18T07:33:19.222Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/1a/22f675a7030188c509430c1b32add1dae85029b7d648fe9241efa334fd0a/tenax_tn-0.8.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:b954c86ede32344722ff8faefa1aab26562a165cccf78f34857e586d1702ea41", size = 1018482, upload-time = "2026-06-18T07:33:20.715Z" },
+    { url = "https://files.pythonhosted.org/packages/19/f5/82f85979f4d6867ff1b93d7e9d293cc403640c4940545bb0cefcdf42dd92/tenax_tn-0.8.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:b4c54f7583afe40a1801e9b3efe107b73175772b53f01df98a297346378e3931", size = 3711314, upload-time = "2026-06-18T07:33:22.162Z" },
 ]
 
 [[package]]
