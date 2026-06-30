@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Mathematics",
 ]
 dependencies = [
-    "tenax-tn>=0.3.0",
+    "tenax-tn>=0.8.0",
 ]
 
 [project.optional-dependencies]
